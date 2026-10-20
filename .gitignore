@@ -10,6 +10,9 @@ lowongan_archive_*.json
 cv_parsed_debug.json
 PATH_CV/*
 !PATH_CV/.gitkeep
+!PATH_CV/LAMAR/
+PATH_CV/LAMAR/*
+!PATH_CV/LAMAR/.gitkeep
 
 # Python
 __pycache__/
