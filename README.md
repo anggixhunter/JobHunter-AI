@@ -267,7 +267,10 @@ Pull request, laporan bug, dan saran fitur sangat diterima. Kalau aplikasi ini m
 
 ## Dukungan
 
-Aplikasi ini gratis dan akan tetap gratis. Kalau Anda ingin membalas sedikit, donasi sepenuhnya sukarela dan dipakai untuk biaya operasional (domain, kopi saat memperbaiki bug). Tombol **Sponsor** ada di kanan atas halaman repo ini.
+Aplikasi ini gratis dan akan tetap gratis. Kalau Anda ingin membalas sedikit, donasi sepenuhnya sukarela dan dipakai untuk biaya operasional (domain, kopi saat memperbaiki bug).
+
+- **Trakteer** — https://trakteer.id/anggi_linden (QRIS, GoPay, OVO, DANA, transfer bank)
+- Tombol **Sponsor** juga ada di kanan atas halaman repo ini.
 
 Terima kasih sudah memakai. Semoga lekas dapat kerja.
 
