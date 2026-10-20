@@ -396,7 +396,7 @@ def render_cv(doc, profil, nama_user, summary, parsed):
     p.paragraph_format.space_after = Pt(2)
 
     kontak = profil.get('kontak', {}) or {}
-    bagian = [kontak.get('email') or '', kontak.get('telepon') or '', profil.get('lokasi') or '']
+    bagian = [kontak.get('email') or '', kontak.get('telepon') or '']
     bagian = [b for b in bagian if b]
     ln = (kontak.get('linkedin') or '').strip()
     if ln and ln != '-':
