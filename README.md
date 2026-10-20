@@ -98,7 +98,7 @@ Proses ini beberapa menit dan mengunduh cukup banyak paket (`python-jobspy` mena
 
 Aplikasi ini memakai **dua** layanan AI, keduanya gratis:
 
-- **Gemini** — model utama (`gemini-3.6-flash`)
+- **Gemini** — model utama (`gemini-3.5-flash-lite`)
 - **Groq** — cadangan otomatis kalau Gemini gagal atau kuota habis (`openai/gpt-oss-120b`)
 
 Anda butuh satu key dari masing-masing. Keduanya gratis, cukup daftar dengan akun Google.
