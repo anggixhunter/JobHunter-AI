@@ -1,0 +1,38 @@
+# Secrets
+api_key.env
+.env
+
+# Data pribadi
+CLAUDE.md
+profil_user.json
+lowongan_cocok.json
+lowongan_archive_*.json
+cv_parsed_debug.json
+PATH_CV/*
+!PATH_CV/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor & OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code lokal
+.claude/settings.local.json
+
+# Log & output
+*.log

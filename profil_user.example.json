@@ -1,0 +1,36 @@
+{
+  "nama_lengkap": "Nama Lengkap Anda",
+  "kontak": {
+    "email": "email@contoh.com",
+    "telepon": "+62 812 0000 0000",
+    "linkedin": "linkedin.com/in/username"
+  },
+  "posisi_target": "Data Engineer / Application Support",
+  "tipe_kerja": [
+    "Hybrid",
+    "Onsite",
+    "Remote"
+  ],
+  "lokasi": "Jakarta, Jabodetabek",
+  "range_gaji": "> 10.000.000 IDR",
+  "total_tahun_pengalaman": 3,
+  "hard_skills": [
+    "Python",
+    "SQL",
+    "ETL",
+    "Power BI"
+  ],
+  "soft_skills": [
+    "Problem Solving",
+    "Technical Documentation",
+    "Cross-functional Collaboration"
+  ],
+  "pencapaian_kunci": [
+    "Built ETL pipelines to consolidate reporting data from multiple source systems.",
+    "Automated recurring operational reports, reducing manual work by several hours per week.",
+    "Provided production support for core applications and resolved escalated incidents."
+  ],
+  "ringkasan_profesi": "IT professional with experience in data management, ETL pipelines, and application support. Skilled in SQL, Python, and reporting automation.",
+  "cv_mentah": "Isi teks CV asli Anda di sini. Bagian ini dipakai sebagai cadangan kalau parser gagal membaca struktur CV.",
+  "diperbarui_pada": "2026-01-01 00:00"
+}

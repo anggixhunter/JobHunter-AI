@@ -1,0 +1,17 @@
+[
+  {
+    "title": "Data Engineer",
+    "company": "Contoh Perusahaan",
+    "snippet": "Ringkasan deskripsi lowongan dari sumber pencarian.",
+    "url": "https://contoh.com/lowongan/12345",
+    "sumber": "indeed",
+    "lokasi": "Jakarta, Indonesia",
+    "tanggal_post": "2026-01-01",
+    "skor": 85,
+    "alasan": "Keahlian dan pengalaman kandidat sesuai dengan kebutuhan posisi.",
+    "status": "pending",
+    "tanggal_ditemukan": "2026-01-01",
+    "tanggal_dilamar": null,
+    "catatan": ""
+  }
+]
