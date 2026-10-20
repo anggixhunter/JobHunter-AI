@@ -295,6 +295,23 @@ Kalau keduanya habis, tunggu beberapa jam. Tidak ada biaya yang muncul — aplik
 
 ---
 
+### Sumber data lowongan
+
+Proyek ini bergantung pada dua layanan pihak ketiga yang **tidak** dikelola oleh saya:
+
+| Sumber | Jenis | Catatan |
+|---|---|---|
+| [jobspy](https://github.com/speedyapply/JobSpy) | Library open source | Membaca Indeed & LinkedIn. Kalau situs mengubah struktur halaman, scraper bisa rusak sampai library diperbarui. |
+| [Freehire](https://freehire.me) | API publik, tanpa key | Tidak ada dokumentasi resmi atau janji ketersediaan. Endpoint bisa berubah sewaktu-waktu. |
+
+Konsekuensinya:
+
+- **Bukan layanan yang bisa dijamin.** Kalau salah satu mati, Fase 2 tetap jalan dengan sumber yang tersisa — cukup lebih sedikit hasil.
+- **Jangan buka issue soal 429 atau hasil kosong dari Indeed/LinkedIn.** Itu pembatasan dari situsnya, bukan bug aplikasi. Solusinya proxy atau jeda waktu.
+- **Jangan menambahkan API key berbayar** (SerpAPI, Bright Data, dan sejenisnya) sebagai default. Proyek ini harus tetap nol biaya; kalau ingin memakai proxy, sediakan lewat variabel `PROXY` yang opsional.
+
+Kalau menemukan sumber lowongan gratis lain yang stabil, usulkan dulu lewat issue sebelum membuat PR.
+
 ## Berkontribusi
 
 Pull request, laporan bug, dan saran fitur sangat diterima. Kalau aplikasi ini membantu Anda, bagikan ke teman yang sedang mencari kerja — itu sudah cukup sebagai balas budi.
