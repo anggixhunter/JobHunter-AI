@@ -47,15 +47,48 @@ Fase 3 (Tailor)    -> PATH_CV/LAMAR/<tanggal>/<perusahaan>_<posisi>/
 
 ## Instalasi
 
+### 0. Prasyarat
+
+**Python 3.10 atau lebih baru** wajib terpasang. Cek dulu:
+
+```bash
+python --version
+```
+
+Kalau muncul `Python was not found` atau versinya di bawah 3.10:
+
+1. Buka https://www.python.org/downloads/
+2. Unduh **Python 3.12** (versi yang stabil dan banyak dipakai library di proyek ini)
+3. Jalankan installer, dan **centang "Add python.exe to PATH"** di halaman pertama — ini yang paling sering terlewat
+4. Tutup semua terminal, buka baru, cek lagi `python --version`
+
+Tanpa Python, `Run.bat` akan langsung menutup atau menampilkan `'python' is not recognized`.
+
+Selain Python, tidak ada yang perlu dipasang manual — Git hanya diperlukan kalau Anda meng-clone repo. Kalau mengunduh ZIP, lewati langkah `git clone`.
+
+### 1. Unduh proyek
+
 ```bash
 git clone <repo-url>
 cd Seeker-GIT
+```
 
+### 2. Siapkan environment
+
+```bash
 python -m venv venv
 venv\Scripts\activate
+```
 
+Prompt terminal akan berubah jadi `(venv)`. Kalau tidak berubah, aktivasi gagal — jangan lanjut.
+
+### 3. Pasang dependensi
+
+```bash
 pip install -r requirements.txt
 ```
+
+Proses ini beberapa menit dan mengunduh cukup banyak paket (`python-jobspy` menarik pandas, numpy, dan lainnya).
 
 ### Windows: konversi PDF
 
@@ -244,6 +277,7 @@ Solusi:
 
 | Error | Penyebab | Solusi |
 |---|---|---|
+| `'python' is not recognized` | Python belum terpasang atau tidak masuk PATH | Install ulang dari python.org, centang "Add python.exe to PATH" |
 | `ModuleNotFoundError: No module named 'groq'` | venv tidak aktif | `venv\Scripts\activate` lalu `pip install -r requirements.txt` |
 | `ModuleNotFoundError: No module named 'jobspy'` | terinstal di Python lain | aktifkan venv dulu, baru `pip install python-jobspy` |
 | `name 'load_dotenv' is not defined` | import hilang | `pip install python-dotenv` |
