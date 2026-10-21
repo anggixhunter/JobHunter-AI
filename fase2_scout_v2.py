@@ -26,8 +26,8 @@ TEMPERATURE = 0.3
 PROFIL_FILE = "profil_user.json"
 LOWONGAN_FILE = "lowongan_cocok.json"
 
-JRESULT = 4
-JRESULT2 = 4
+JRESULT = 5
+JRESULT2 = 5
 SITES = ["indeed", "linkedin"]
 COUNTRY = "indonesia"
 NEGARA = "Indonesia"
@@ -376,10 +376,9 @@ def main():
         log("⚖️ Matcher", f"#{i}: {job['title'][:40]}...")
         skor_str, alasan = nilai_kecocokan(job, profil)
 
-        try:
-            skor = int(''.join(filter(str.isdigit, str(skor_str))))
-        except Exception:
-            skor = 0
+        # Ambil angka pertama saja ("30/100" → 30, bukan 30100) & clamp 0-100
+        m_angka = re.search(r'\d+', str(skor_str))
+        skor = min(int(m_angka.group()), 100) if m_angka else 0
 
         if skor < 60:
             log("📉 Skip", f"{job['title'][:45]} → {skor_str} (bawah 60)")
