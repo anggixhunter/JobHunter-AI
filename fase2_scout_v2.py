@@ -26,8 +26,8 @@ TEMPERATURE = 0.3
 PROFIL_FILE = "profil_user.json"
 LOWONGAN_FILE = "lowongan_cocok.json"
 
-JRESULT = 5
-JRESULT2 = 5
+JRESULT = 4
+JRESULT2 = 4
 SITES = ["indeed", "linkedin"]
 COUNTRY = "indonesia"
 NEGARA = "Indonesia"
@@ -50,13 +50,16 @@ def log(agent, msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {agent}: {msg}")
 
 
-def ask_ai(prompt, system=""):
+def ask_ai(prompt, system="", label=""):
+    """Coba Gemini, fallback Groq. Log provider yang berhasil dipakai."""
     try:
         response = gemini_client.models.generate_content(
             model=GEMINI_MODEL,
             contents=f"{system}\n\n{prompt}"
         )
-        return response.text
+        if response and response.text:
+            log("✅ Gemini", f"OK {label}".strip())
+            return response.text
     except Exception as e:
         log("⚠️ Gemini", f"Gagal ({str(e)[:80]}). Pindah ke Groq...")
 
@@ -66,6 +69,7 @@ def ask_ai(prompt, system=""):
             messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
             temperature=TEMPERATURE
         )
+        log("✅ Groq", f"OK {label}".strip())
         return resp.choices[0].message.content
     except Exception as e:
         log("❌ Error AI", f"Kedua AI gagal: {str(e)[:60]}")
@@ -135,20 +139,23 @@ def lokasi_pencarian(profil):
 # ==========================================
 # 5. SCOUT - PENCARIAN (jobspy)
 # ==========================================
-def cari_jobspy(profil):
+def cari_jobspy(profil, existing_urls=None):
+    existing_urls = existing_urls or set()
     lokasi = lokasi_pencarian(profil)
     kata_kunci = daftar_kata_kunci(profil)
-    per_kata = max(1, JRESULT // len(kata_kunci))
+    # Oversample: duplikat dibuang, jadi minta lebih biar tetap dapat JRESULT baru
+    target = JRESULT * 2
+    per_kata = max(1, target // len(kata_kunci))
     hasil = {}
     linkedin_mati = False
 
     for i, kata in enumerate(kata_kunci):
-        if len(hasil) >= JRESULT:
+        if len(hasil) >= target:
             break
         if i > 0:
             time.sleep(JEDA_DETIK)
 
-        sisa = JRESULT - len(hasil)
+        sisa = target - len(hasil)
         situs = [s for s in SITES if not (s == "linkedin" and linkedin_mati)]
         if not situs:
             log("⚠️ jobspy", "Semua situs diblokir")
@@ -178,7 +185,7 @@ def cari_jobspy(profil):
 
         for _, baris in df.iterrows():
             url = bersih(baris.get('job_url_direct')) or bersih(baris.get('job_url'))
-            if not url or url in hasil:
+            if not url or url in hasil or url in existing_urls:
                 continue
             hasil[url] = {
                 "title": bersih(baris.get('title'), "No Title"),
@@ -190,18 +197,19 @@ def cari_jobspy(profil):
                 "tanggal_post": bersih(baris.get('date_posted')),
             }
 
-    log("✅ jobspy", f"{len(hasil)} lowongan unik (target {JRESULT}, {len(kata_kunci)} kata kunci)")
-    return list(hasil.values())
+    log("✅ jobspy", f"{len(hasil)} lowongan unik (target {JRESULT} baru, maks {target})")
+    return list(hasil.values())[:JRESULT]
 
 
 # ==========================================
 # 5b. FREEHIRE - SUMBER GRATIS (API KEYLESS)
 # ==========================================
-def cari_freehire(profil, limit=JRESULT2):
+def cari_freehire(profil, existing_urls=None, limit=JRESULT2):
+    existing_urls = existing_urls or set()
     posisi = profil.get('posisi_target', 'Software Engineer')
     lokasi = profil.get('lokasi', 'Indonesia').strip().lower()
 
-    base = {"q": posisi, "limit": limit, "sort": "posted_at", "order": "desc"}
+    base = {"q": posisi, "limit": limit * 2, "sort": "posted_at", "order": "desc"}
     extras = {}
 
     skills = ",".join(profil.get('hard_skills', [])[:3])
@@ -250,14 +258,21 @@ def cari_freehire(profil, limit=JRESULT2):
         return []
 
     results = []
+    seen_urls = set(existing_urls)
     for j in data:
+        if len(results) >= limit:
+            break
+        url = j.get("url", "")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
         deskripsi = re.sub(r'<[^>]+>', ' ', j.get("description") or "")
         deskripsi = re.sub(r'\s+', ' ', deskripsi).strip()
         results.append({
             "title": j.get("title", "No Title"),
             "company": j.get("company", "Unknown"),
             "snippet": deskripsi[:600],
-            "url": j.get("url", ""),
+            "url": url,
             "sumber": "freehire",
             "lokasi": "",
             "tanggal_post": "",
@@ -300,15 +315,16 @@ Format output:
 Skor: [0-100]
 Alasan: [1 kalimat]
 """
-    hasil = ask_ai(prompt, "Kamu matcher objektif. Jawab singkat.")
+    hasil = ask_ai(prompt, "Kamu matcher objektif. Jawab singkat.", label=job['title'][:40])
     if hasil:
-        skor = "N/A"
-        alasan = "Tidak ada alasan."
-        for line in hasil.strip().split('\n'):
-            if line.lower().startswith("skor:"):
-                skor = line.replace("Skor:", "").strip()
-            elif line.lower().startswith("alasan:"):
-                alasan = line.replace("Alasan:", "").strip()
+        teks = hasil.strip()
+        # Toleran markdown & spasi: "**Skor:** 75", "skor = 75", "Skor: 75/100"
+        m_skor = re.search(r'skor\s*[:=]\s*\**\s*(\d{1,3})', teks, re.I)
+        m_alasan = re.search(r'alasan\s*[:=]\s*\**\s*(.+)', teks, re.I)
+        skor = m_skor.group(1) if m_skor else "N/A"
+        alasan = m_alasan.group(1).strip().strip('*').strip() if m_alasan else "Tidak ada alasan."
+        if not m_skor:
+            log("⚠️ Matcher", f"Skor tak terbaca dari output: {teks[:80]!r}")
         return skor, alasan
     return "N/A", "Gagal menilai."
 
@@ -341,8 +357,9 @@ def main():
     else:
         log("📂 Database", "Pencarian pertama")
 
-    jobs_jobspy = cari_jobspy(profil)
-    jobs_freehire = cari_freehire(profil)
+    existing_urls = {j['url'] for j in existing_jobs if j.get('url')}
+    jobs_jobspy = cari_jobspy(profil, existing_urls)
+    jobs_freehire = cari_freehire(profil, existing_urls)
     jobs = gabung_lowongan(jobs_jobspy, jobs_freehire)
     log("🔎 Gabungan", f"{len(jobs)} unik (jobspy {len(jobs_jobspy)} + freehire {len(jobs_freehire)})")
 
@@ -364,23 +381,26 @@ def main():
         except Exception:
             skor = 0
 
-        if skor >= 60:
-            print(f"\n[{len(lowongan_cocok)+1}] ✅ {job['title']}")
-            print(f"    🏢 {job['company']}")
-            print(f"    🔗 {job['url']}")
-            print(f"    🎯 Skor: {skor}%")
-            print(f"    💡 {alasan}")
-            print("-" * 60)
+        if skor < 60:
+            log("📉 Skip", f"{job['title'][:45]} → {skor_str} (bawah 60)")
+            continue
 
-            lowongan_cocok.append({
-                **job,
-                "skor": skor,
-                "alasan": alasan,
-                "status": "pending",
-                "tanggal_ditemukan": datetime.now().strftime("%Y-%m-%d"),
-                "tanggal_dilamar": None,
-                "catatan": ""
-            })
+        print(f"\n[{len(lowongan_cocok)+1}] ✅ {job['title']}")
+        print(f"    🏢 {job['company']}")
+        print(f"    🔗 {job['url']}")
+        print(f"    🎯 Skor: {skor}%")
+        print(f"    💡 {alasan}")
+        print("-" * 60)
+
+        lowongan_cocok.append({
+            **job,
+            "skor": skor,
+            "alasan": alasan,
+            "status": "pending",
+            "tanggal_ditemukan": datetime.now().strftime("%Y-%m-%d"),
+            "tanggal_dilamar": None,
+            "catatan": ""
+        })
 
     if lowongan_cocok:
         all_jobs, added = merge_jobs(existing_jobs, lowongan_cocok)
