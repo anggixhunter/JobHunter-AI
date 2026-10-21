@@ -454,7 +454,7 @@ def render_cv(doc, profil, nama_user, summary, parsed):
 # ==========================================
 # 6. EXPORTER (WITH PATH LENGTH PROTECTION)
 # ==========================================
-def _safe_filename(text, max_len=30):
+def _safe_filename(text, max_len=50):
     """Bersihkan karakter ilegal & potong jika terlalu panjang"""
     cleaned = re.sub(r'[\\/*?:"<>|]', "", text)
     cleaned = re.sub(r'\s+', "_", cleaned.strip())
@@ -468,8 +468,8 @@ def simpan_hasil_lamaran(job, data_dokumen, cv_asli_teks, profil):
     tanggal_hari_ini = datetime.now().strftime("%Y-%m-%d")
 
     # 🔥 FIX: Limit panjang nama untuk cegah error Windows Path Limit (260 char)
-    safe_company = _safe_filename(company, max_len=10)
-    safe_title = _safe_filename(job_title, max_len=10)
+    safe_company = _safe_filename(company, max_len=50)
+    safe_title = _safe_filename(job_title, max_len=50)
 
     folder_name = f"{safe_company}_{safe_title}"
     folder_path = os.path.join(BASE_LAMAR_DIR, tanggal_hari_ini, folder_name)
