@@ -137,7 +137,7 @@ def update_single_job(jobs, idx):
     """Helper untuk update status satu job"""
     selected = jobs[idx]
 
-    print(f"\n📋 Lowongan: {selected['title']}")
+    print(f"\n📋 Lowongan: {selected['title']} - {selected['company']}")
     print(f"   Status saat ini: {selected.get('status', 'pending')}")
 
     print("\n🔄 Ubah status ke:")
