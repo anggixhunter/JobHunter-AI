@@ -17,21 +17,21 @@ try:
         messages=[{"role": "user", "content": "ping"}],
         max_tokens=5
     )
-    print("✅ Groq API Key : MASIH BERFUNGSI (Aktif)")
+    print("Groq API Key : MASIH BERFUNGSI (Aktif)")
 except Exception as e:
-    print(f"❌ Groq API Key : MATI / ERROR ({e})")
+    print(f"Groq API Key : MATI / ERROR ({e})")
 
 try:
     gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     gemini_client.models.generate_content(model=GEMINI_MODEL, contents="ping")
-    print(f"✅ Gemini API Key: MASIH BERFUNGSI (Aktif, {GEMINI_MODEL})")
+    print(f"Gemini API Key: MASIH BERFUNGSI (Aktif, {GEMINI_MODEL})")
 except Exception as e:
-    print(f"❌ Gemini API Key: MATI / ERROR ({e})")
+    print(f"Gemini API Key: MATI / ERROR ({e})")
 
 try:
     df = scrape_jobs(site_name=["indeed"], search_term="test", results_wanted=1, country_indeed="indonesia", verbose=0)
-    print(f"✅ jobspy       : BERFUNGSI ({len(df)} baris)")
+    print(f"jobspy       : BERFUNGSI ({len(df)} baris)")
 except Exception as e:
-    print(f"❌ jobspy       : ERROR ({e})")
+    print(f"jobspy       : ERROR ({e})")
 
 print("\n=== SELESAI ===")

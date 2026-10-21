@@ -13,13 +13,13 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-# 🔥 Import untuk convert DOCX ke PDF
+# Import untuk convert DOCX ke PDF
 try:
     from docx2pdf import convert
     PDF_ENABLED = True
 except ImportError:
     PDF_ENABLED = False
-    print("⚠️ Warning: docx2pdf tidak terinstall. CV akan disimpan dalam format .docx saja.")
+    print("Warning: docx2pdf tidak terinstall. CV akan disimpan dalam format .docx saja.")
 
 
 # ==========================================
@@ -62,7 +62,7 @@ def ask_ai(prompt, system=""):
         if response and response.text:
             return response.text
     except Exception as e:
-        log("⚠️ Gemini", f"Gagal ({str(e)[:80]}). Pindah ke Groq...")
+        log("Gemini", f"Gagal ({str(e)[:80]}). Pindah ke Groq...")
 
     if groq_client:
         try:
@@ -73,7 +73,7 @@ def ask_ai(prompt, system=""):
             )
             return resp.choices[0].message.content
         except Exception as e2:
-            log("❌ Error AI", f"Kedua AI gagal: {str(e2)[:60]}")
+            log("Error AI", f"Kedua AI gagal: {str(e2)[:60]}")
     return None
 
 
@@ -87,12 +87,12 @@ def baca_pdf_asli(pdf_path):
             teks_pdf += (page.extract_text() or "") + "\n"
         return teks_pdf.strip()
     except Exception as e:
-        log("⚠️ PDF", f"Gagal membaca PDF: {e}")
+        log("PDF", f"Gagal membaca PDF: {e}")
         return None
 
 
 def ambil_deskripsi_loker(url):
-    log("🕷️ Scraper", "Mengambil detail dari URL...")
+    log("Scraper", "Mengambil detail dari URL...")
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
         response = requests.get(url, headers=headers, timeout=10)
@@ -107,7 +107,7 @@ def ambil_deskripsi_loker(url):
 
 
 # ==========================================
-# 2. 🔥 TRACKING SYSTEM - UPDATE STATUS
+# 2. TRACKING SYSTEM - UPDATE STATUS
 # ==========================================
 def update_job_status(job_url, new_status, catatan=""):
     """Update status lowongan setelah diproses"""
@@ -124,7 +124,7 @@ def update_job_status(job_url, new_status, catatan=""):
                 job['tanggal_dilamar'] = datetime.now().strftime("%Y-%m-%d")
             if catatan:
                 job['catatan'] = catatan
-            log("📝 Status", f"Updated ke '{new_status}': {job['title'][:40]}")
+            log("Status", f"Updated ke '{new_status}': {job['title'][:40]}")
             break
 
     with open(LOWONGAN_FILE, "w", encoding="utf-8") as f:
@@ -143,9 +143,9 @@ def _ekstrak_json(teks):
 
 
 def generate_dokumen_lamaran(profil, cv_asli_teks, job_title, company, job_description):
-    log("🧠 Tailor", f"Menyesuaikan untuk {job_title} di {company}...")
+    log("Tailor", f"Menyesuaikan untuk {job_title} di {company}...")
 
-    # 🔥 FIX: Gabungkan CV + pencapaian dari profil
+    # FIX: Gabungkan CV + pencapaian dari profil
     pencapaian = profil.get('pencapaian_kunci', [])
     ringkasan_profesi = profil.get('ringkasan_profesi', '')
     pencapaian_text = "\n".join([f"• {p}" for p in pencapaian]) if pencapaian else ""
@@ -187,7 +187,7 @@ Output HANYA JSON:
         try:
             return _ekstrak_json(hasil)
         except Exception as e:
-            log("❌ Error", f"Gagal parse JSON: {e}")
+            log("Error", f"Gagal parse JSON: {e}")
     return None
 
 
@@ -467,7 +467,7 @@ def simpan_hasil_lamaran(job, data_dokumen, cv_asli_teks, profil):
 
     tanggal_hari_ini = datetime.now().strftime("%Y-%m-%d")
 
-    # 🔥 FIX: Limit panjang nama untuk cegah error Windows Path Limit (260 char)
+    # FIX: Limit panjang nama untuk cegah error Windows Path Limit (260 char)
     safe_company = _safe_filename(company, max_len=50)
     safe_title = _safe_filename(job_title, max_len=50)
 
@@ -486,32 +486,32 @@ def simpan_hasil_lamaran(job, data_dokumen, cv_asli_teks, profil):
     # ---------- 1. CV ----------
     parsed = parse_cv(cv_asli_teks or "")
     if not parsed["experience"] and profil.get('cv_mentah'):
-        log("⚠️ Parser", "Pakai cv_mentah dari profil")
+        log("Parser", "Pakai cv_mentah dari profil")
         parsed = parse_cv(profil['cv_mentah'])
     if not parsed["experience"]:
-        log("⚠️ Parser", "Pengalaman kosong. Set DEBUG_CV=True")
+        log("Parser", "Pengalaman kosong. Set DEBUG_CV=True")
 
     cv_doc = Document()
     render_cv(cv_doc, profil, nama_user, data_dokumen.get('ringkasan_tailored', ''), parsed)
     cv_docx_path = os.path.join(folder_path, cv_filename)
     cv_doc.save(cv_docx_path)
 
-    # 🔥 CONVERT DOCX KE PDF (OTOMATIS)
+    # CONVERT DOCX KE PDF (OTOMATIS)
     if PDF_ENABLED:
         try:
             cv_pdf_filename = cv_filename.replace('.docx', '.pdf')
             cv_pdf_path = os.path.join(folder_path, cv_pdf_filename)
             convert(cv_docx_path, cv_pdf_path)
-            log("📄 PDF", f"CV berhasil dikonversi ke PDF: {cv_pdf_filename}")
+            log("PDF", f"CV berhasil dikonversi ke PDF: {cv_pdf_filename}")
 
             # Hapus file DOCX agar hanya tersisa PDF (opsional)
             try:
                 os.remove(cv_docx_path)
-                log("🗑️ Cleanup", "File .docx sementara dihapus, tersisa file .pdf")
+                log("Cleanup", "File .docx sementara dihapus, tersisa file .pdf")
             except:
                 pass
         except Exception as e:
-            log("⚠️ PDF Error", f"Gagal convert ke PDF: {e}. File .docx tetap disimpan.")
+            log("PDF Error", f"Gagal convert ke PDF: {e}. File .docx tetap disimpan.")
 
     if DEBUG_CV:
         with open(os.path.join(folder_path, "cv_parsed_debug.json"), "w", encoding="utf-8") as f:
@@ -538,19 +538,19 @@ def simpan_hasil_lamaran(job, data_dokumen, cv_asli_teks, profil):
     cl_docx_path = os.path.join(folder_path, cl_filename)
     cl_doc.save(cl_docx_path)
 
-    # 🔥 Convert Cover Letter juga ke PDF
+    # Convert Cover Letter juga ke PDF
     if PDF_ENABLED:
         try:
             cl_pdf_filename = cl_filename.replace('.docx', '.pdf')
             cl_pdf_path = os.path.join(folder_path, cl_pdf_filename)
             convert(cl_docx_path, cl_pdf_path)
-            log("📄 PDF", f"Cover Letter berhasil dikonversi ke PDF: {cl_pdf_filename}")
+            log("PDF", f"Cover Letter berhasil dikonversi ke PDF: {cl_pdf_filename}")
             try:
                 os.remove(cl_docx_path)
             except:
                 pass
         except Exception as e:
-            log("⚠️ PDF Error", f"Gagal convert Cover Letter: {e}")
+            log("PDF Error", f"Gagal convert Cover Letter: {e}")
 
     # ---------- 3. EMAIL BODY ----------
     with open(os.path.join(folder_path, f"Email_Body_{safe_company}.txt"), "w", encoding="utf-8") as f:
@@ -564,7 +564,7 @@ def simpan_hasil_lamaran(job, data_dokumen, cv_asli_teks, profil):
         f.write(f"Skor Match : {job.get('skor', 'N/A')}%\n")
         f.write(f"URL Loker  : {url}\n")
 
-    log("💾 Success", f"Tersimpan di: {folder_path}")
+    log("Success", f"Tersimpan di: {folder_path}")
     return folder_path
 
 
@@ -573,11 +573,11 @@ def simpan_hasil_lamaran(job, data_dokumen, cv_asli_teks, profil):
 # ==========================================
 def main():
     print("\n" + "=" * 60)
-    print("🎯 JOB HUNTER AI - FASE 3: TAILOR (v2 WITH TRACKING)")
+    print("JOB HUNTER AI - FASE 3: TAILOR (v2 WITH TRACKING)")
     print("=" * 60)
 
     if not os.path.exists(PROFIL_FILE) or not os.path.exists(LOWONGAN_FILE) or not os.path.exists(CV_PATHS_FILE):
-        log("❌ Error", "File memori tidak lengkap!")
+        log("Error", "File memori tidak lengkap!")
         return
 
     with open(PROFIL_FILE, "r", encoding="utf-8") as f:
@@ -588,25 +588,25 @@ def main():
         cv_paths = json.load(f)
 
     if not cv_paths:
-        log("❌ Error", "CV path tidak ditemukan!")
+        log("Error", "CV path tidak ditemukan!")
         return
 
     cv_pdf_path = cv_paths[0]
-    log("📄 CV Asli", f"Membaca: {cv_pdf_path}")
+    log("CV Asli", f"Membaca: {cv_pdf_path}")
     cv_asli_teks = baca_pdf_asli(cv_pdf_path)
 
     if not cv_asli_teks:
-        log("⚠️ Warning", "Pakai cv_mentah dari profil")
+        log("Warning", "Pakai cv_mentah dari profil")
         cv_asli_teks = profil.get('cv_mentah', '')
 
-    # 🔥 FILTER: Hanya proses yang status 'pending'
+    # FILTER: Hanya proses yang status 'pending'
     pending_jobs = [j for j in list_lowongan if j.get('status', 'pending') == 'pending']
 
     if not pending_jobs:
-        log("⚠️ Warning", "Tidak ada lowongan pending.")
+        log("Warning", "Tidak ada lowongan pending.")
         return
 
-    print(f"\n🚀 Memproses {len(pending_jobs)} lowongan pending...")
+    print(f"\nMemproses {len(pending_jobs)} lowongan pending...")
     print("-" * 60)
 
     sukses_count = 0
@@ -627,16 +627,16 @@ def main():
         if hasil_ai:
             simpan_hasil_lamaran(job, hasil_ai, cv_asli_teks, profil)
 
-            # 🔥 AUTO UPDATE STATUS jadi 'applied'
+            # AUTO UPDATE STATUS jadi 'applied'
             #update_job_status(url, "applied")
 
             sukses_count += 1
-            log("✅ OK", "Dokumen dibuat & status updated")
+            log("OK", "Dokumen dibuat & status updated")
         else:
-            log("❌ Gagal", "AI gagal generate")
+            log("Gagal", "AI gagal generate")
 
     print("\n" + "=" * 60)
-    print(f"🎉 SELESAI! {sukses_count} lowongan diproses.")
+    print(f"SELESAI! {sukses_count} lowongan diproses.")
     print("=" * 60)
 
 

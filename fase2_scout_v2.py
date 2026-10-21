@@ -26,8 +26,8 @@ TEMPERATURE = 0.3
 PROFIL_FILE = "profil_user.json"
 LOWONGAN_FILE = "lowongan_cocok.json"
 
-JRESULT = 4
-JRESULT2 = 4
+JRESULT = 5
+JRESULT2 = 5
 SITES = ["indeed", "linkedin"]
 COUNTRY = "indonesia"
 NEGARA = "Indonesia"
@@ -58,10 +58,10 @@ def ask_ai(prompt, system="", label=""):
             contents=f"{system}\n\n{prompt}"
         )
         if response and response.text:
-            log("✅ Gemini", f"OK {label}".strip())
+            log("Gemini", f"OK {label}".strip())
             return response.text
     except Exception as e:
-        log("⚠️ Gemini", f"Gagal ({str(e)[:80]}). Pindah ke Groq...")
+        log("Gemini", f"Gagal ({str(e)[:80]}). Pindah ke Groq...")
 
     try:
         resp = groq_client.chat.completions.create(
@@ -69,10 +69,10 @@ def ask_ai(prompt, system="", label=""):
             messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
             temperature=TEMPERATURE
         )
-        log("✅ Groq", f"OK {label}".strip())
+        log("Groq", f"OK {label}".strip())
         return resp.choices[0].message.content
     except Exception as e:
-        log("❌ Error AI", f"Kedua AI gagal: {str(e)[:60]}")
+        log("Error AI", f"Kedua AI gagal: {str(e)[:60]}")
         return None
 
 
@@ -101,9 +101,9 @@ def merge_jobs(existing_jobs, new_jobs):
         if not is_duplicate_url(new_job['url'], existing_jobs):
             merged.append(new_job)
             added_count += 1
-            log("✅ Baru", f"Lowongan baru: {new_job['title'][:50]}...")
+            log("Baru", f"Lowongan baru: {new_job['title'][:50]}...")
         else:
-            log("⏭️ Skip", f"Duplikat: {new_job['title'][:50]}...")
+            log("Skip", f"Duplikat: {new_job['title'][:50]}...")
 
     return merged, added_count
 
@@ -158,10 +158,10 @@ def cari_jobspy(profil, existing_urls=None):
         sisa = target - len(hasil)
         situs = [s for s in SITES if not (s == "linkedin" and linkedin_mati)]
         if not situs:
-            log("⚠️ jobspy", "Semua situs diblokir")
+            log("jobspy", "Semua situs diblokir")
             break
 
-        log("🕵️ Scout", f"jobspy: '{kata}' @ {lokasi} (maks {min(per_kata, sisa)})")
+        log("Scout", f"jobspy: '{kata}' @ {lokasi} (maks {min(per_kata, sisa)})")
         try:
             df = scrape_jobs(
                 site_name=situs,
@@ -178,9 +178,9 @@ def cari_jobspy(profil, existing_urls=None):
             pesan = str(e)
             if "429" in pesan and "linkedin" in pesan.lower():
                 linkedin_mati = True
-                log("⚠️ LinkedIn", "Diblokir 429. Lanjut Indeed saja untuk sesi ini.")
+                log("LinkedIn", "Diblokir 429. Lanjut Indeed saja untuk sesi ini.")
             else:
-                log("⚠️ jobspy", f"Gagal '{kata}': {pesan[:80]}")
+                log("jobspy", f"Gagal '{kata}': {pesan[:80]}")
             continue
 
         for _, baris in df.iterrows():
@@ -197,7 +197,7 @@ def cari_jobspy(profil, existing_urls=None):
                 "tanggal_post": bersih(baris.get('date_posted')),
             }
 
-    log("✅ jobspy", f"{len(hasil)} lowongan unik (target {JRESULT} baru, maks {target})")
+    log("jobspy", f"{len(hasil)} lowongan unik (target {JRESULT} baru, maks {target})")
     return list(hasil.values())[:JRESULT]
 
 
@@ -246,15 +246,15 @@ def cari_freehire(profil, existing_urls=None, limit=JRESULT2):
             r.raise_for_status()
             data = r.json().get("data", [])
         except Exception as e:
-            log("⚠️ Freehire", f"Gagal: {str(e)[:80]}")
+            log("Freehire", f"Gagal: {str(e)[:80]}")
             return []
         if data:
             if extra is not attempts[0]:
-                log("🛟 Freehire", f"Hasil kosong dengan filter penuh, longgarkan: {list(extra.keys()) or 'tanpa filter'}")
+                log("Freehire", f"Hasil kosong dengan filter penuh, longgarkan: {list(extra.keys()) or 'tanpa filter'}")
             break
 
     if not data:
-        log("⚠️ Freehire", "0 hasil walau filter dilepas")
+        log("Freehire", "0 hasil walau filter dilepas")
         return []
 
     results = []
@@ -277,7 +277,7 @@ def cari_freehire(profil, existing_urls=None, limit=JRESULT2):
             "lokasi": "",
             "tanggal_post": "",
         })
-    log("✅ Freehire", f"{len(results)} hasil (langsung dari ATS perusahaan)")
+    log("Freehire", f"{len(results)} hasil (langsung dari ATS perusahaan)")
     return results
 
 
@@ -324,7 +324,7 @@ Alasan: [1 kalimat]
         skor = m_skor.group(1) if m_skor else "N/A"
         alasan = m_alasan.group(1).strip().strip('*').strip() if m_alasan else "Tidak ada alasan."
         if not m_skor:
-            log("⚠️ Matcher", f"Skor tak terbaca dari output: {teks[:80]!r}")
+            log("Matcher", f"Skor tak terbaca dari output: {teks[:80]!r}")
         return skor, alasan
     return "N/A", "Gagal menilai."
 
@@ -334,61 +334,61 @@ Alasan: [1 kalimat]
 # ==========================================
 def main():
     print("\n" + "="*60)
-    print("🎯 JOB HUNTER AI - FASE 2: SCOUT (jobspy)")
-    print(f"📊 Sumber: jobspy ({', '.join(SITES)}) + Freehire")
+    print("JOB HUNTER AI - FASE 2: SCOUT (jobspy)")
+    print(f"Sumber: jobspy ({', '.join(SITES)}) + Freehire")
     print("="*60)
 
     if not os.path.exists(PROFIL_FILE):
-        log("❌ Error", f"'{PROFIL_FILE}' tidak ditemukan!")
+        log("Error", f"'{PROFIL_FILE}' tidak ditemukan!")
         return
 
     with open(PROFIL_FILE, "r", encoding="utf-8") as f:
         profil = json.load(f)
 
-    log("💾 Memori", f"{profil.get('nama_lengkap')} - {profil.get('posisi_target')}")
+    log("Memori", f"{profil.get('nama_lengkap')} - {profil.get('posisi_target')}")
 
     existing_jobs = load_existing_jobs()
     if existing_jobs:
         pending = sum(1 for j in existing_jobs if j.get('status', 'pending') == 'pending')
         applied = sum(1 for j in existing_jobs if j.get('status') == 'applied')
         rejected = sum(1 for j in existing_jobs if j.get('status') in ['not_suitable', 'rejected'])
-        log("📂 Database", f"{len(existing_jobs)} lowongan sebelumnya")
-        log("📊 Status", f"Pending: {pending} | Applied: {applied} | Rejected: {rejected}")
+        log("Database", f"{len(existing_jobs)} lowongan sebelumnya")
+        log("Status", f"Pending: {pending} | Applied: {applied} | Rejected: {rejected}")
     else:
-        log("📂 Database", "Pencarian pertama")
+        log("Database", "Pencarian pertama")
 
     existing_urls = {j['url'] for j in existing_jobs if j.get('url')}
     jobs_jobspy = cari_jobspy(profil, existing_urls)
     jobs_freehire = cari_freehire(profil, existing_urls)
     jobs = gabung_lowongan(jobs_jobspy, jobs_freehire)
-    log("🔎 Gabungan", f"{len(jobs)} unik (jobspy {len(jobs_jobspy)} + freehire {len(jobs_freehire)})")
+    log("Gabungan", f"{len(jobs)} unik (jobspy {len(jobs_jobspy)} + freehire {len(jobs_freehire)})")
 
     if not jobs:
-        log("⚠️ Scout", "Tidak ada hasil")
+        log("Scout", "Tidak ada hasil")
         return
 
     print("\n" + "="*60)
-    print("📊 HASIL (Skor >= 60%)")
+    print("HASIL (Skor >= 60%)")
     print("="*60)
 
     lowongan_cocok = []
     for i, job in enumerate(jobs, 1):
-        log("⚖️ Matcher", f"#{i}: {job['title'][:40]}...")
+        log("Matcher", f"#{i}: {job['title'][:40]}...")
         skor_str, alasan = nilai_kecocokan(job, profil)
 
-        # Ambil angka pertama saja ("30/100" → 30, bukan 30100) & clamp 0-100
+        # Ambil angka pertama saja ("30/100" -> 30) & clamp 0-100
         m_angka = re.search(r'\d+', str(skor_str))
         skor = min(int(m_angka.group()), 100) if m_angka else 0
 
         if skor < 60:
-            log("📉 Skip", f"{job['title'][:45]} → {skor_str} (bawah 60)")
+            log("Skip", f"{job['title'][:45]} -> {skor_str} (bawah 60)")
             continue
 
-        print(f"\n[{len(lowongan_cocok)+1}] ✅ {job['title']}")
-        print(f"    🏢 {job['company']}")
-        print(f"    🔗 {job['url']}")
-        print(f"    🎯 Skor: {skor}%")
-        print(f"    💡 {alasan}")
+        print(f"\n[{len(lowongan_cocok)+1}] {job['title']}")
+        print(f"    {job['company']}")
+        print(f"    {job['url']}")
+        print(f"    Skor: {skor}%")
+        print(f"    {alasan}")
         print("-" * 60)
 
         lowongan_cocok.append({
@@ -408,15 +408,15 @@ def main():
             json.dump(all_jobs, f, indent=2, ensure_ascii=False)
 
         print("\n" + "="*60)
-        print("💾 DATABASE UPDATE:")
+        print("DATABASE UPDATE:")
         print(f"   • Ditemukan: {len(lowongan_cocok)}")
         print(f"   • Ditambahkan: {added}")
         print(f"   • Duplikat: {len(lowongan_cocok) - added}")
         print(f"   • Total: {len(all_jobs)}")
         print("="*60)
-        log("🎉 Sukses", "Fase 2 selesai!")
+        log("Sukses", "Fase 2 selesai!")
     else:
-        log("⚠️ Sistem", "Tidak ada lowongan >= 60%")
+        log("Sistem", "Tidak ada lowongan >= 60%")
 
 
 if __name__ == "__main__":

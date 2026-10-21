@@ -63,15 +63,15 @@ def cari_freehire(profil, limit=JRESULT):
             payload = r.json()
             data = payload.get("data", [])
         except Exception as e:
-            print(f"⚠️ Error: {str(e)[:80]}")
+            print(f"Error: {str(e)[:80]}")
             return []
         if data:
             if extra is not attempts[0]:
-                print(f"🛟 Filter dilonggarkan: {list(extra.keys()) or 'tanpa filter'}")
+                print(f"Filter dilonggarkan: {list(extra.keys()) or 'tanpa filter'}")
             break
 
     if not data:
-        print("⚠️ 0 hasil")
+        print("0 hasil")
         return []
 
     results = []
@@ -95,39 +95,39 @@ def cari_freehire(profil, limit=JRESULT):
 # ==========================================
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("🔍 CEK FREEHIRE MANUAL")
+    print("CEK FREEHIRE MANUAL")
     print("="*60)
 
     if not os.path.exists(PROFIL_FILE):
-        print(f"❌ File '{PROFIL_FILE}' tidak ditemukan!")
+        print(f"File '{PROFIL_FILE}' tidak ditemukan!")
         exit()
 
     with open(PROFIL_FILE, "r", encoding="utf-8") as f:
         profil = json.load(f)
 
-    print(f"\n📋 Profil: {profil.get('nama_lengkap')}")
-    print(f"🎯 Target: {profil.get('posisi_target')}")
-    print(f"📍 Lokasi: {profil.get('lokasi')}")
-    print(f"🔧 Skills: {', '.join(profil.get('hard_skills', [])[:50])}")
-    print(f"💼 Tipe: {', '.join(profil.get('tipe_kerja', []))}")
+    print(f"\nProfil: {profil.get('nama_lengkap')}")
+    print(f"Target: {profil.get('posisi_target')}")
+    print(f"Lokasi: {profil.get('lokasi')}")
+    print(f"Skills: {', '.join(profil.get('hard_skills', [])[:50])}")
+    print(f"Tipe: {', '.join(profil.get('tipe_kerja', []))}")
 
-    print("\n🔎 Mencari di Freehire...")
+    print("\nMencari di Freehire...")
     jobs = cari_freehire(profil)
 
     if not jobs:
-        print("\n⚠️ Tidak ada hasil")
+        print("\nTidak ada hasil")
         exit()
 
-    print(f"\n✅ Ditemukan {len(jobs)} lowongan:\n")
+    print(f"\nDitemukan {len(jobs)} lowongan:\n")
     print("="*60)
 
     for i, job in enumerate(jobs, 1):
         print(f"\n[{i}] {job['title']}")
-        print(f"    🏢 {job['company']}")
-        print(f"    📍 {job['location']} | {job['work_mode']}")
-        print(f"    📅 {job['posted_at']}")
-        print(f"    🔗 {job['url']}")
-        print(f"    📝 {job['snippet'][:150]}...")
+        print(f"    {job['company']}")
+        print(f"    {job['location']} | {job['work_mode']}")
+        print(f"    {job['posted_at']}")
+        print(f"    {job['url']}")
+        print(f"    {job['snippet'][:150]}...")
         print("-" * 60)
 
-    print("\n✅ Selesai!")
+    print("\nSelesai!")

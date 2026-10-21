@@ -13,6 +13,7 @@ PATH_CV/*
 !PATH_CV/LAMAR/
 PATH_CV/LAMAR/*
 !PATH_CV/LAMAR/.gitkeep
+fase2_scout_v2 - Backup.py
 
 # Python
 __pycache__/

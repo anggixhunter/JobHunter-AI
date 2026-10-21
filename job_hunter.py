@@ -34,26 +34,26 @@ def log(agent, msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {agent}: {msg}")
 
 def ask_ai(prompt, system=""):
-    log("🧠 AI", f"Mencoba {GEMINI_MODEL}...")
+    log("AI", f"Mencoba {GEMINI_MODEL}...")
     try:
         response = gemini_client.models.generate_content(
             model=GEMINI_MODEL,
             contents=f"{system}\n\n{prompt}"
         )
-        log("✅ Gemini", f"Berhasil dengan {GEMINI_MODEL}")
+        log("Gemini", f"Berhasil dengan {GEMINI_MODEL}")
         return response.text
     except Exception as e:
-        log("⚠️ Gemini", f"Error: {str(e)[:80]}. Pindah ke {GROQ_MODEL}...")
+        log("Gemini", f"Error: {str(e)[:80]}. Pindah ke {GROQ_MODEL}...")
         try:
             resp = groq_client.chat.completions.create(
                 model=GROQ_MODEL,
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
                 temperature=TEMPERATURE
             )
-            log("✅ Groq", f"Berhasil dengan {GROQ_MODEL}")
+            log("Groq", f"Berhasil dengan {GROQ_MODEL}")
             return resp.choices[0].message.content
         except Exception as e2:
-            log("❌ Error", f"Kedua AI gagal: {str(e2)[:100]}")
+            log("Error", f"Kedua AI gagal: {str(e2)[:100]}")
             return None
 
 # ==========================================
@@ -63,7 +63,7 @@ def setup_path_cv_dir():
     """Buat folder PATH_CV jika belum ada"""
     if not os.path.exists(PATH_CV_DIR):
         os.makedirs(PATH_CV_DIR)
-        log("📁 Sistem", f"Folder dibuat: {PATH_CV_DIR}")
+        log("Sistem", f"Folder dibuat: {PATH_CV_DIR}")
 
 def simpan_cv_paths(paths_list):
     """Simpan daftar path CV ke file JSON"""
@@ -83,9 +83,9 @@ def tambah_cv_path(new_path):
     if new_path not in paths:
         paths.append(new_path)
         simpan_cv_paths(paths)
-        log("💾 Path CV", f"Path baru tersimpan: {new_path}")
+        log("Path CV", f"Path baru tersimpan: {new_path}")
     else:
-        log("ℹ️ Path CV", "Path sudah ada di daftar.")
+        log("Path CV", "Path sudah ada di daftar.")
 
 def daftar_cv_di_folder():
     """Scan file CV (PDF/DOCX) langsung di folder PATH_CV"""
@@ -99,7 +99,7 @@ def daftar_cv_di_folder():
 
 def minta_taruh_cv():
     """Minta user menaruh CV di folder PATH_CV, Enter untuk cek ulang"""
-    print("\n📂 PILIH CV:")
+    print("\nPILIH CV:")
     print(f"   Folder CV: {PATH_CV_DIR}")
     print("   Taruh file CV (.pdf / .docx) di folder tersebut.")
     input("   Tekan Enter untuk cek ulang...")
@@ -113,7 +113,7 @@ def pilih_cv():
             minta_taruh_cv()
             continue
 
-        print("\n📂 PILIH CV:")
+        print("\nPILIH CV:")
         for i, path in enumerate(files, 1):
             print(f"   [{i}] {os.path.basename(path)}")
 
@@ -133,7 +133,7 @@ def pilih_cv():
                 path = files[idx - 1]
                 simpan_cv_paths([path])
                 return path
-        log("❌ Error", "Pilihan tidak valid.")
+        log("Error", "Pilihan tidak valid.")
 
 def baca_cv(file_path):
     """Baca isi file CV (PDF/DOCX)"""
@@ -156,7 +156,7 @@ def simpan_profil(data):
     data["diperbarui_pada"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     with open(PROFIL_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    log("💾 Memori", f"Profil tersimpan di '{PROFIL_FILE}'")
+    log("Memori", f"Profil tersimpan di '{PROFIL_FILE}'")
 
 def baca_profil():
     if os.path.exists(PROFIL_FILE):
@@ -166,7 +166,7 @@ def baca_profil():
 
 def tampilkan_profil(data):
     print("\n" + "="*60)
-    print("📇 PROFIL YANG TERSIMPAN")
+    print("PROFIL YANG TERSIMPAN")
     print("="*60)
     display_data = {k: v for k, v in data.items() if k not in ["diperbarui_pada", "cv_mentah"]}
     print(json.dumps(display_data, indent=2, ensure_ascii=False))
@@ -182,13 +182,13 @@ def jalankan_sesi(mode="baru", profil_lama=None):
     
     # --- MODE: GANTI CV SAJA ---
     if mode == "ganti_cv" and profil_lama:
-        print("\n📄 Ganti CV (pengalaman & preferensi tetap)")
+        print("\nGanti CV (pengalaman & preferensi tetap)")
         cv_path = pilih_cv()
         if not cv_path:
             return None
         cv_text = baca_cv(cv_path)
         if not cv_text:
-            log("❌ Error", "Gagal membaca CV.")
+            log("Error", "Gagal membaca CV.")
             return None
         
         jawaban_pengalaman = '\n'.join(profil_lama.get("pencapaian_kunci", []))
@@ -198,13 +198,13 @@ def jalankan_sesi(mode="baru", profil_lama=None):
         Lokasi: {profil_lama.get('lokasi', '')}
         Gaji: {profil_lama.get('range_gaji', '')}
         """
-        log("✅ Sistem", "CV baru dibaca. Pengalaman & preferensi lama dipertahankan.")
+        log("Sistem", "CV baru dibaca. Pengalaman & preferensi lama dipertahankan.")
     
     # --- MODE: TAMBAH PENGALAMAN ---
     elif mode == "tambah_pengalaman" and profil_lama:
         cv_text = profil_lama.get("cv_mentah", "")
         if not cv_text:
-            log("⚠️ Warning", "CV lama tidak ditemukan. Upload CV baru.")
+            log("Warning", "CV lama tidak ditemukan. Upload CV baru.")
             cv_path = pilih_cv()
             if not cv_path:
                 return None
@@ -219,8 +219,8 @@ def jalankan_sesi(mode="baru", profil_lama=None):
         Gaji: {profil_lama.get('range_gaji', '')}
         """
         
-        print("\n💼 Tambah Pengalaman Baru")
-        print("💬 Ceritakan pengalaman/proyek tambahan. (Ketik 'Bungkus' untuk selesai)")
+        print("\nTambah Pengalaman Baru")
+        print("Ceritakan pengalaman/proyek tambahan. (Ketik 'Bungkus' untuk selesai)")
         print("-" * 60)
         
         jawaban_list = []
@@ -237,35 +237,35 @@ def jalankan_sesi(mode="baru", profil_lama=None):
                     "Kamu pendengar aktif dan suportif."
                 )
                 if respons:
-                    print(f"\n🧠 AI: {respons}")
+                    print(f"\nAI: {respons}")
         
         pengalaman_lama = '\n'.join(profil_lama.get("pencapaian_kunci", []))
         pengalaman_baru = '\n'.join([f"- {j}" for j in jawaban_list])
         jawaban_pengalaman = f"{pengalaman_lama}\n{pengalaman_baru}"
         
-        log("✅ Sistem", f"Menambahkan {len(jawaban_list)} pengalaman baru.")
+        log("Sistem", f"Menambahkan {len(jawaban_list)} pengalaman baru.")
     
     # --- MODE: BARU (DARI NOL) ---
     else:
-        print("\n📄 Upload CV Anda")
+        print("\nUpload CV Anda")
         cv_path = pilih_cv()
         if not cv_path:
             return None
         cv_text = baca_cv(cv_path)
         if not cv_text:
-            log("❌ Error", "Gagal membaca CV.")
+            log("Error", "Gagal membaca CV.")
             return None
         
-        log("✅ Sistem", f"CV berhasil dibaca ({len(cv_text)} karakter)")
+        log("Sistem", f"CV berhasil dibaca ({len(cv_text)} karakter)")
         
         # --- SESI PENGALAMAN ---
-        print("\n💼 Ceritakan Pengalaman Tambahan")
+        print("\nCeritakan Pengalaman Tambahan")
         pertanyaan = ask_ai(
             f"Berdasarkan CV berikut, buat 3 pertanyaan untuk menggali pengalaman.\nCV:\n{cv_text}\n\nKeluarkan HANYA 3 pertanyaan, satu per baris.",
             "Kamu rekruter ramah."
         )
         print("\n" + (pertanyaan if pertanyaan else "1. Pencapaian terbesar?\n2. Proyek membanggakan?\n3. Skill yang ingin ditonjolkan?"))
-        print("\n💬 Ngobrol bebas. (Ketik 'Bungkus' untuk selesai)")
+        print("\nNgobrol bebas. (Ketik 'Bungkus' untuk selesai)")
         print("-" * 60)
         
         jawaban_list = []
@@ -282,13 +282,13 @@ def jalankan_sesi(mode="baru", profil_lama=None):
                     "Kamu pendengar aktif."
                 )
                 if respons:
-                    print(f"\n🧠 AI: {respons}")
+                    print(f"\nAI: {respons}")
         
         jawaban_pengalaman = '\n'.join([f"- {j}" for j in jawaban_list])
         
         # --- SESI PREFERENSI ---
         print("\n" + "-" * 60)
-        print("\n🎯 Preferensi Kerja (posisi, tipe/lokasi, gaji)")
+        print("\nPreferensi Kerja (posisi, tipe/lokasi, gaji)")
         print("   (Ketik 'Bungkus' untuk selesai)")
         print("-" * 60)
         
@@ -304,7 +304,7 @@ def jalankan_sesi(mode="baru", profil_lama=None):
         preferensi_text = '\n'.join(preferensi_list)
     
     # --- GABUNGKAN MENJADI JSON (DENGAN AUTO-TRANSLATE) ---
-    log("🧠 Profiler", "Menggabungkan & menerjemahkan ke bahasa Inggris profesional...")
+    log("Profiler", "Menggabungkan & menerjemahkan ke bahasa Inggris profesional...")
     
     final_prompt = f"""
 Gabungkan informasi berikut menjadi JSON rapi dalam BAHASA INGGRIS PROFESIONAL:
@@ -352,7 +352,7 @@ HANYA keluarkan JSON murni.
         try:
             return json.loads(hasil)
         except:
-            log("❌ Error", "JSON tidak valid.")
+            log("Error", "JSON tidak valid.")
             print(hasil)
     return None
 
@@ -362,8 +362,8 @@ HANYA keluarkan JSON murni.
 setup_path_cv_dir()
 
 print("\n" + "="*60)
-print("🎯 JOB HUNTER AI - FASE 1: PROFILER INTERAKTIF")
-print(f"🤖 Model: {GEMINI_MODEL} (Primary) → {GROQ_MODEL} (Backup)")
+print("JOB HUNTER AI - FASE 1: PROFILER INTERAKTIF")
+print(f"Model: {GEMINI_MODEL} (Primary) → {GROQ_MODEL} (Backup)")
 print("="*60)
 
 profil_lama = baca_profil()
@@ -371,7 +371,7 @@ data_final = None
 
 if profil_lama:
     tampilkan_profil(profil_lama)
-    print(f"\n📅 Terakhir diperbarui: {profil_lama.get('diperbarui_pada', 'tidak diketahui')}")
+    print(f"\nTerakhir diperbarui: {profil_lama.get('diperbarui_pada', 'tidak diketahui')}")
     
     print("\nPilih:")
     print("[1] Pakai profil lama (load profil lama)")
@@ -382,35 +382,35 @@ if profil_lama:
     pilihan = input("\nPilihan Anda (1/2/3/4): ").strip()
     
     if pilihan == "1":
-        log("💾 Memori", "Profil lama dimuat.")
+        log("Memori", "Profil lama dimuat.")
         data_final = profil_lama
     elif pilihan == "2":
-        log("🔄 Reset", "Membuat profil baru dari nol...")
+        log("Reset", "Membuat profil baru dari nol...")
         data_final = jalankan_sesi(mode="baru")
         if data_final:
             simpan_profil(data_final)
             tampilkan_profil(data_final)
     elif pilihan == "3":
-        log("➕ Tambah", "Menambah pengalaman baru...")
+        log("Tambah", "Menambah pengalaman baru...")
         data_final = jalankan_sesi(mode="tambah_pengalaman", profil_lama=profil_lama)
         if data_final:
             simpan_profil(data_final)
             tampilkan_profil(data_final)
     elif pilihan == "4":
-        log("📄 Ganti CV", "Mengganti CV saja...")
+        log("Ganti CV", "Mengganti CV saja...")
         data_final = jalankan_sesi(mode="ganti_cv", profil_lama=profil_lama)
         if data_final:
             simpan_profil(data_final)
             tampilkan_profil(data_final)
     else:
-        log("❌ Error", "Pilihan tidak valid.")
+        log("Error", "Pilihan tidak valid.")
 else:
-    log("💾 Memori", "Belum ada profil. Mulai sesi pertama...")
+    log("Memori", "Belum ada profil. Mulai sesi pertama...")
     data_final = jalankan_sesi(mode="baru")
     if data_final:
         simpan_profil(data_final)
         tampilkan_profil(data_final)
 
 if data_final:
-    log("🎉 Sukses", "Profil siap! Semua pencapaian sudah dalam bahasa Inggris profesional.")
-    log("🚀 Next", "Fase 2 (Scout) akan membaca 'profil_user.json' untuk mencari lowongan.")
+    log("Sukses", "Profil siap! Semua pencapaian sudah dalam bahasa Inggris profesional.")
+    log("Next", "Fase 2 (Scout) akan membaca 'profil_user.json' untuk mencari lowongan.")
