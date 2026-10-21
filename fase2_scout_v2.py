@@ -26,8 +26,8 @@ TEMPERATURE = 0.3
 PROFIL_FILE = "profil_user.json"
 LOWONGAN_FILE = "lowongan_cocok.json"
 
-JRESULT = 5
-JRESULT2 = 5
+JRESULT = 4
+JRESULT2 = 4
 SITES = ["indeed", "linkedin"]
 COUNTRY = "indonesia"
 NEGARA = "Indonesia"
