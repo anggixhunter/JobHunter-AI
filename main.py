@@ -57,79 +57,86 @@ def validasi_dependencies():
 # ==========================================
 # QUICK UPDATE PROMPT (CEK STATUS LOKER)
 # ==========================================
-def quick_update_prompt():
-    """Cek status loker yang sudah di-apply atau belum"""
-    jobs = load_lowongan()
+def _pending_jobs():
+    return [j for j in load_lowongan() if j.get('status', 'pending') == 'pending']
 
-    if not jobs:
-        return
-
-    # Filter pending & applied dalam 7 hari terakhir
-    pending_jobs = [j for j in jobs if j.get('status', 'pending') == 'pending']
-
-    recent_applied = []
-    for j in jobs:
-        if j.get('status') == 'applied' and j.get('tanggal_dilamar'):
-            try:
-                tanggal = datetime.strptime(j['tanggal_dilamar'], "%Y-%m-%d")
-                if (datetime.now() - tanggal).days <= 7:
-                    recent_applied.append(j)
-            except:
-                pass
-
-    review_jobs = pending_jobs #+ recent_applied
-
-    if not review_jobs:
-        return
-
+def _tampilkan_review(review_jobs):
     print("\n" + "="*60)
-    print("📋 CEK STATUS LOKER - Lowongan yang perlu review:")
+    print("📋 CEK STATUS LOKER - Lowongan pending:")
     print("="*60)
 
     for i, job in enumerate(review_jobs, 1):
-        status_icon = {
-            'pending': '🟡',
-            'applied': '🟢'
-        }.get(job.get('status', 'pending'), '⚪')
-
-        print(f"\n[{i}] {status_icon} {job['title'][:45]}")
+        print(f"\n[{i}] 🟡 {job['title'][:45]}")
         print(f"    🏢 {job.get('company', 'N/A')[:30]}")
         print(f"    📅 {job.get('tanggal_ditemukan', 'N/A')}")
         if job.get('tanggal_dilamar'):
             print(f"    ✅ Dilamar: {job['tanggal_dilamar']}")
 
     print("\n" + "="*60)
-    update_choice = input("Ada yang mau diupdate statusnya? (y/n): ").strip().lower()
 
-    if update_choice != 'y':
-        return
+def quick_update_prompt():
+    """Cek status loker yang sudah di-apply atau belum"""
+    status_map = {
+        "1": "pending",
+        "2": "applied",
+        "3": "not_suitable",
+        "4": "rejected"
+    }
 
     while True:
-        pilihan = input(f"\nPilih nomor (1-{len(review_jobs)}, 0=selesai): ").strip()
+        review_jobs = _pending_jobs()
+
+        if not review_jobs:
+            print("\n✅ Tidak ada lowongan pending.\n")
+            return
+
+        _tampilkan_review(review_jobs)
+
+        if input("Ada yang mau diupdate statusnya? (y/n): ").strip().lower() != 'y':
+            return
+
+        pilihan = input(f"\nPilih nomor (1-{len(review_jobs)}, pisah koma mis 2,5,7; 0=selesai): ").strip()
 
         if pilihan == '0':
             break
 
         try:
-            idx = int(pilihan) - 1
-            if idx < 0 or idx >= len(review_jobs):
+            idxs = [int(x) - 1 for x in pilihan.split(',') if x.strip()]
+            if not idxs or any(i < 0 or i >= len(review_jobs) for i in idxs):
                 print("❌ Nomor tidak valid!")
                 continue
-        except:
+        except ValueError:
             print("❌ Input tidak valid!")
             continue
 
-        selected_job = review_jobs[idx]
-        original_idx = next(i for i, j in enumerate(jobs) if j['url'] == selected_job['url'])
+        print("\n🔄 Ubah status ke:")
+        print("[1] pending")
+        print("[2] applied (sudah dilamar)")
+        print("[3] not_suitable (tidak cocok)")
+        print("[4] rejected (ditolak perusahaan)")
+        print("[0] Batal")
 
-        updated = update_single_job(jobs, original_idx)
+        status_choice = input("\nPilihan (0-4): ").strip()
 
-        if updated:
-            jobs = load_lowongan()
+        if status_choice not in status_map:
+            print("❌ Pilihan tidak valid!")
+            continue
 
-        lanjut = input("\nUpdate lowongan lain? (y/n): ").strip().lower()
-        if lanjut != 'y':
-            break
+        new_status = status_map[status_choice]
+        catatan = input("\n📝 Catatan (opsional, Enter untuk skip): ").strip()
+
+        jobs = load_lowongan()
+        urls = {review_jobs[i]['url'] for i in idxs}
+        for j in jobs:
+            if j['url'] in urls:
+                j['status'] = new_status
+                if new_status == "applied" and not j.get('tanggal_dilamar'):
+                    j['tanggal_dilamar'] = datetime.now().strftime("%Y-%m-%d")
+                if catatan:
+                    j['catatan'] = catatan
+
+        save_lowongan(jobs)
+        log(f"✅ {len(urls)} lowongan diupdate ke '{new_status}'")
 
     print("\n✅ Update status selesai!\n")
 
