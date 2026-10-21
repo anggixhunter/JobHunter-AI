@@ -27,7 +27,7 @@ Semua data Anda — profil, CV, riwayat lamaran — tersimpan di folder proyek, 
 
 ---
 
-Asisten pencarian kerja otomatis: bangun profil dari CV, cari lowongan dari Indeed/LinkedIn/Freehire, nilai kecocokan pakai AI, lalu buat CV + cover letter yang sudah disesuaikan per lowongan.
+Asisten pencarian kerja: bangun profil dari CV, cari lowongan dari Indeed/LinkedIn/Freehire, nilai kecocokan pakai AI, lalu siapkan CV + cover letter yang sudah disesuaikan per lowongan. Anda tetap melamar sendiri — aplikasi ini yang menyiapkan bahannya.
 
 ## Alur
 
@@ -44,6 +44,8 @@ Fase 3 (Tailor)    -> PATH_CV/LAMAR/<tanggal>/<perusahaan>_<posisi>/
 | 3 | `fase3_tailor_v2.py` | Scrape detail lowongan, tulis ulang ringkasan + cover letter, ekspor DOCX/PDF |
 
 `main.py` adalah menu utama. Hanya lowongan dengan skor >= 60 yang masuk database.
+
+Fase 3 berhenti setelah dokumen siap. **Lamaran tetap dikirim manual oleh Anda** — lihat [Fase 3 tidak mengirim lamaran](#fase-3-tidak-mengirim-lamaran--anda-yang-melamar).
 
 ## Instalasi
 
@@ -98,7 +100,7 @@ Proses ini beberapa menit dan mengunduh cukup banyak paket (`python-jobspy` mena
 
 Aplikasi ini memakai **dua** layanan AI, keduanya gratis:
 
-- **Gemini** — model utama (`gemini-3.5-flash-lite`)
+- **Gemini** — model utama (`gemini-3.6-flash`)
 - **Groq** — cadangan otomatis kalau Gemini gagal atau kuota habis (`openai/gpt-oss-120b`)
 
 Anda butuh satu key dari masing-masing. Keduanya gratis, cukup daftar dengan akun Google.
@@ -230,7 +232,7 @@ python main.py
 | 6 | Update status (`pending` / `applied` / `not_suitable` / `rejected`) |
 | 7 | Arsipkan lowongan `not_suitable` + `rejected` ke `lowongan_archive_YYYY-MM.json` |
 
-Status lowongan menentukan Fase 3: hanya `pending` yang diproses. Ubah ke `applied` setelah melamar.
+Status lowongan menentukan Fase 3: hanya `pending` yang diproses. Fase 3 hanya menyiapkan dokumen — lamaran dikirim manual, lalu ubah statusnya ke `applied` lewat menu `[6]`.
 
 ## Output Fase 3
 
@@ -239,8 +241,25 @@ PATH_CV/LAMAR/2026-10-20/Xendit_Merchant_T/
 ├── CV_<nama>_<posisi>.pdf
 ├── Resume_<nama>.pdf          # cover letter
 ├── Email_Body_<perusahaan>.txt
-└── info_loker.txt
+└── info_loker.txt             # berisi URL lowongan asli
 ```
+
+Semua file ini adalah bahan untuk Anda kirim sendiri. Tidak ada lamaran yang terkirim otomatis.
+
+## Fase 3 tidak mengirim lamaran — Anda yang melamar
+
+Fase 3 berhenti di penyiapan dokumen. Folder `<perusahaan>_<posisi>/` sudah berisi CV, cover letter, email body, dan info lowongan yang siap pakai — tapi **tidak ada yang dikirim ke mana pun**.
+
+Melamar tetap dilakukan manual:
+
+1. Buka `info_loker.txt` untuk URL lowongan aslinya
+2. Buka URL tersebut, unggah CV dari folder itu, tempel cover letter
+3. Kalau lowongan minta lamaran via email, salin teks dari `Email_Body_<perusahaan>.txt`
+4. Setelah benar-benar terkirim, ubah status di menu `[6]` menjadi `applied`
+
+**Kenapa tidak otomatis?** Setiap portal kerja (LinkedIn, JobStreet, Glints, Indeed, situs karir perusahaan) punya formulir, login, dan CAPTCHA sendiri. Mengotomatiskan pelamaran berarti membeli layanan browser/proxy berbayar, dan sebagian besar portal melarangnya di ToS. Itu bertentangan dengan dua hal yang dipegang proyek ini: nol biaya, dan tidak membuat akun Anda berisiko diblokir.
+
+Fase 3 menghemat bagian yang paling melelahkan — menulis ulang CV dan surat lamaran per lowongan. Sisanya, beberapa menit klik dan unggah per lamaran, tetap di tangan Anda.
 
 ## Struktur Data
 
@@ -256,7 +275,7 @@ Untuk melihat bentuk datanya, ada `profil_user.example.json` dan `lowongan_cocok
 
 ### Umum
 
-- **LinkedIn 429** — IP residensial cepat diblokir LinkedIn. Indeed + Freehire tetap jalan. Solusinya proxy berbayar atau tunggu beberapa jam.
+- **LinkedIn 429** — IP residensial cepat diblokir LinkedIn. Indeed + Freehire tetap jalan. Atur jeda di `JEDA_DETIK`, atau isi `PROXY` di `api_key.env` kalau punya proxy. LinkedIn otomatis dimatikan untuk sesi itu kalau tetap kena.
 - **Glassdoor & Google** — tidak didukung untuk Indonesia, hasil selalu kosong. Sengaja dimatikan.
 - **Hasil lowongan sedikit** — perlebar `posisi_target` di profil, atau naikkan `JRESULT` / `JRESULT2` di `fase2_scout_v2.py`.
 - **Model Gemini 404** — nama model berubah. Jalankan `python cek_model.py` untuk daftar model valid yang tersedia untuk key Anda.
@@ -295,6 +314,10 @@ Kalau keduanya habis, tunggu beberapa jam. Tidak ada biaya yang muncul — aplik
 
 ---
 
+## Berkontribusi
+
+Pull request, laporan bug, dan saran fitur sangat diterima. Kalau aplikasi ini membantu Anda, bagikan ke teman yang sedang mencari kerja — itu sudah cukup sebagai balas budi.
+
 ### Sumber data lowongan
 
 Proyek ini bergantung pada dua layanan pihak ketiga yang **tidak** dikelola oleh saya:
@@ -311,10 +334,6 @@ Konsekuensinya:
 - **Jangan menambahkan API key berbayar** (SerpAPI, Bright Data, dan sejenisnya) sebagai default. Proyek ini harus tetap nol biaya; kalau ingin memakai proxy, sediakan lewat variabel `PROXY` yang opsional.
 
 Kalau menemukan sumber lowongan gratis lain yang stabil, usulkan dulu lewat issue sebelum membuat PR.
-
-## Berkontribusi
-
-Pull request, laporan bug, dan saran fitur sangat diterima. Kalau aplikasi ini membantu Anda, bagikan ke teman yang sedang mencari kerja — itu sudah cukup sebagai balas budi.
 
 ## Dukungan
 
