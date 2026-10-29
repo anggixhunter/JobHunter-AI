@@ -72,7 +72,7 @@ Selain Python, tidak ada yang perlu dipasang manual — Git hanya diperlukan kal
 
 ```bash
 git clone https://github.com/anggixhunter/JobHunter-AI
-cd Seeker-GIT
+cd JobHunter-AI
 ```
 
 ### 2. Siapkan environment
