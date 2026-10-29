@@ -3,6 +3,8 @@ import os
 import re
 from datetime import datetime
 from google import genai
+from google.genai import types
+import time
 from groq import Groq
 from docx import Document
 from docx.shared import Inches, Pt
@@ -31,7 +33,7 @@ load_dotenv(dotenv_path="api_key.env")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY").strip()
 
-GEMINI_MODEL = "gemini-3.5-flash-lite"
+GEMINI_MODEL = "gemini-3.6-flash"
 GROQ_MODEL = "openai/gpt-oss-120b"
 TEMPERATURE = 0.3
 
@@ -45,8 +47,9 @@ BASE_LAMAR_DIR = os.path.join(BASE_DIR, "PATH_CV", "LAMAR")
 DEBUG_CV = False
 FONT_NAME = "Calibri"
 
-gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+AI_TIMEOUT = 60  # detik. Lewat ini = batal, pindah ke AI cadangan
+gemini_client = genai.Client(api_key=GEMINI_API_KEY, http_options=types.HttpOptions(timeout=AI_TIMEOUT * 1000))
+groq_client = Groq(api_key=GROQ_API_KEY, timeout=AI_TIMEOUT) if GROQ_API_KEY else None
 
 
 def log(agent, msg):
@@ -54,26 +57,33 @@ def log(agent, msg):
 
 
 def ask_ai(prompt, system=""):
+    t0 = time.time()
+    log("AI", f"Mencoba {GEMINI_MODEL} (maks {AI_TIMEOUT}s)...")
     try:
         response = gemini_client.models.generate_content(
             model=GEMINI_MODEL,
             contents=f"{system}\n\n{prompt}"
         )
         if response and response.text:
+            log("Gemini", f"OK ({time.time() - t0:.0f}s)")
             return response.text
+        log("Gemini", "Respons kosong. Pindah ke Groq...")
     except Exception as e:
-        log("Gemini", f"Gagal ({str(e)[:80]}). Pindah ke Groq...")
+        log("Gemini", f"Gagal ({str(e)[:100]}). Pindah ke Groq...")
 
     if groq_client:
+        t0 = time.time()
+        log("AI", f"Mencoba {GROQ_MODEL} (maks {AI_TIMEOUT}s)...")
         try:
             resp = groq_client.chat.completions.create(
                 model=GROQ_MODEL,
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
                 temperature=TEMPERATURE
             )
+            log("Groq", f"OK ({time.time() - t0:.0f}s)")
             return resp.choices[0].message.content
         except Exception as e2:
-            log("Error AI", f"Kedua AI gagal: {str(e2)[:60]}")
+            log("Error AI", f"Groq gagal: {str(e2)[:100]}")
     return None
 
 
@@ -142,25 +152,47 @@ def _ekstrak_json(teks):
     return json.loads(teks[awal:akhir + 1], strict=False)
 
 
+def _ringkas_profil_untuk_ai(profil, cv_asli_teks):
+    """Kirim data terstruktur (bukan teks mentah) ke AI."""
+    if profil.get('pengalaman_kerja'):
+        data = {
+            "summary": profil.get('ringkasan_profesi', ''),
+            "skills": profil.get('hard_skills', []),
+            "pengalaman_kerja": profil['pengalaman_kerja'],
+            "pendidikan": profil.get('pendidikan', []),
+            "pencapaian_kunci": profil.get('pencapaian_kunci', []),
+        }
+        return json.dumps(data, ensure_ascii=False, indent=1)
+    log("Warning", "Profil lama (tanpa pengalaman_kerja). Jalankan Fase 1 opsi [2].")
+    return (cv_asli_teks or "")[:4000]
+
+
+PLACEHOLDER_NAMA_RE = re.compile(
+    r"[\[\(\{<]\s*(?:your\s+name|full\s+name|applicant(?:'s)?(?:\s+name)?|candidate(?:\s+name)?|nama(?:\s+(?:anda|lengkap|kandidat))?|name)\s*[\]\)\}>]",
+    re.I,
+)
+
+
+def _isi_nama(teks, nama):
+    """Ganti placeholder nama ([Applicant], [Your Name], dll) dengan nama asli."""
+    return PLACEHOLDER_NAMA_RE.sub(nama, teks)
+
+
 def generate_dokumen_lamaran(profil, cv_asli_teks, job_title, company, job_description):
     log("Tailor", f"Menyesuaikan untuk {job_title} di {company}...")
-
-    # FIX: Gabungkan CV + pencapaian dari profil
-    pencapaian = profil.get('pencapaian_kunci', [])
-    ringkasan_profesi = profil.get('ringkasan_profesi', '')
-    pencapaian_text = "\n".join([f"• {p}" for p in pencapaian]) if pencapaian else ""
+    data_kandidat = _ringkas_profil_untuk_ai(profil, cv_asli_teks)
+    nama = profil.get('nama_lengkap') or 'Applicant'
+    kontak = profil.get('kontak', {}) or {}
+    kontak_teks = " | ".join(x for x in (kontak.get('email'), kontak.get('telepon')) if x)
 
     prompt = f"""
 Kamu adalah Expert Career Coach & ATS Resume Writer profesional.
 
-TEKS CV ASLI (dari PDF):
-{cv_asli_teks[:2500]}
+DATA KANDIDAT (satu-satunya sumber fakta):
+{data_kandidat}
 
-RINGKASAN PROFESI:
-{ringkasan_profesi}
-
-PENCAPAIAN KUNCI (dari interview):
-{pencapaian_text}
+NAMA KANDIDAT: {nama}
+KONTAK: {kontak_teks}
 
 TARGET LOWONGAN:
 - Posisi: {job_title}
@@ -169,10 +201,10 @@ TARGET LOWONGAN:
 
 ATURAN:
 1. Buat "ringkasan_tailored" (2-3 kalimat, Bahasa Inggris, keyword dari lowongan).
-   GUNAKAN pencapaian kunci untuk summary yang kuat.
-2. Buat "cover_letter" formal profesional (Bahasa Inggris).
-   MANFAATKAN pencapaian kunci untuk show value.
+2. Buat "cover_letter" formal profesional (Bahasa Inggris). Tunjukkan nilai lewat pencapaian nyata.
 3. Buat "email_body" singkat.
+4. JANGAN mengarang pengalaman, angka, skill, atau perusahaan yang tidak ada di data kandidat.
+5. Cover letter dan email WAJIB ditutup dengan nama asli kandidat ("Sincerely," lalu "{nama}"). DILARANG pakai placeholder seperti [Applicant], [Your Name], [Nama].
 
 Output HANYA JSON:
 {{
@@ -185,7 +217,11 @@ Output HANYA JSON:
     hasil = ask_ai(prompt, "Output HANYA JSON murni valid.")
     if hasil:
         try:
-            return _ekstrak_json(hasil)
+            data = _ekstrak_json(hasil)
+            for k in ("cover_letter", "email_body"):
+                if isinstance(data.get(k), str):
+                    data[k] = _isi_nama(data[k], nama)
+            return data
         except Exception as e:
             log("Error", f"Gagal parse JSON: {e}")
     return None
@@ -320,6 +356,52 @@ def parse_cv(teks):
     }
 
 
+def bangun_data_cv(profil):
+    """Ubah profil terstruktur ke bentuk yang dipakai render_cv.
+    Tidak perlu parse teks CV, jadi format CV apa pun aman."""
+    skills = []
+    grup = profil.get('skills_terkelompok') or {}
+    if isinstance(grup, dict) and grup:
+        for kat, isi in grup.items():
+            if isi:
+                skills.append(f"{kat}: {', '.join(map(str, isi))}")
+    else:
+        if profil.get('hard_skills'):
+            skills.append("Technical Skills: " + ", ".join(profil['hard_skills']))
+        if profil.get('soft_skills'):
+            skills.append("Soft Skills: " + ", ".join(profil['soft_skills']))
+
+    experience = []
+    for j in profil.get('pengalaman_kerja', []):
+        header = [x for x in (j.get('perusahaan', ''), j.get('jabatan', '')) if x]
+        experience.append({
+            "header": header,
+            "dates": j.get('periode', ''),
+            "tools": ", ".join(j.get('tech_stack', []) or []),
+            "bullets": list(j.get('pencapaian', []) or []),
+        })
+
+    education = []
+    for e in profil.get('pendidikan', []):
+        if isinstance(e, dict):
+            kiri = " - ".join(x for x in (e.get('gelar', ''), e.get('institusi', '')) if x)
+            teks = " | ".join(x for x in (kiri, e.get('tahun', '')) if x)
+        else:
+            teks = str(e)
+        if teks:
+            education.append(teks)
+
+    return {
+        "summary": profil.get('ringkasan_profesi', ''),
+        "skills": skills,
+        "domain": list(profil.get('domain_expertise', []) or []),
+        "experience": experience,
+        "education": education,
+        "certifications": list(profil.get('sertifikasi', []) or []),
+        "edu_all_bold": True,
+    }
+
+
 # ==========================================
 # 5. RENDER DOCX
 # ==========================================
@@ -447,8 +529,13 @@ def render_cv(doc, profil, nama_user, summary, parsed):
         _heading(doc, "Education")
         for i, e in enumerate(parsed["education"]):
             p = doc.add_paragraph()
-            _font(p.add_run(e), bold=(i == 0))
+            _font(p.add_run(e), bold=(parsed.get("edu_all_bold") or i == 0))
             p.paragraph_format.space_after = Pt(1)
+
+    if parsed.get("certifications"):
+        _heading(doc, "Certifications")
+        for c in parsed["certifications"]:
+            _bullet(doc, c, label_bold=False)
 
 
 # ==========================================
@@ -481,15 +568,18 @@ def simpan_hasil_lamaran(job, data_dokumen, cv_asli_teks, profil):
     safe_user_name = _safe_filename(short_user_name, max_len=20)
 
     cv_filename = f"CV_{safe_user_name}_{safe_title}.docx"
-    cl_filename = f"Resume_{safe_user_name}.docx"
+    cl_filename = f"CoverLetter_{safe_user_name}.docx"
 
     # ---------- 1. CV ----------
-    parsed = parse_cv(cv_asli_teks or "")
-    if not parsed["experience"] and profil.get('cv_mentah'):
-        log("Parser", "Pakai cv_mentah dari profil")
-        parsed = parse_cv(profil['cv_mentah'])
-    if not parsed["experience"]:
-        log("Parser", "Pengalaman kosong. Set DEBUG_CV=True")
+    if profil.get('pengalaman_kerja'):
+        parsed = bangun_data_cv(profil)
+    else:
+        log("Parser", "Profil lama tanpa pengalaman_kerja. Pakai parser teks (kurang akurat). Jalankan Fase 1 opsi [2].")
+        parsed = parse_cv(cv_asli_teks or "")
+        if not parsed["experience"] and profil.get('cv_mentah'):
+            parsed = parse_cv(profil['cv_mentah'])
+        if not parsed["experience"]:
+            log("Parser", "Pengalaman kosong. Set DEBUG_CV=True")
 
     cv_doc = Document()
     render_cv(cv_doc, profil, nama_user, data_dokumen.get('ringkasan_tailored', ''), parsed)
@@ -576,7 +666,7 @@ def main():
     print("JOB HUNTER AI - FASE 3: TAILOR (v2 WITH TRACKING)")
     print("=" * 60)
 
-    if not os.path.exists(PROFIL_FILE) or not os.path.exists(LOWONGAN_FILE) or not os.path.exists(CV_PATHS_FILE):
+    if not os.path.exists(PROFIL_FILE) or not os.path.exists(LOWONGAN_FILE):
         log("Error", "File memori tidak lengkap!")
         return
 
@@ -584,20 +674,17 @@ def main():
         profil = json.load(f)
     with open(LOWONGAN_FILE, "r", encoding="utf-8") as f:
         list_lowongan = json.load(f)
-    with open(CV_PATHS_FILE, "r", encoding="utf-8") as f:
-        cv_paths = json.load(f)
+    cv_asli_teks = profil.get('cv_mentah', '')
+    if not cv_asli_teks and os.path.exists(CV_PATHS_FILE):
+        with open(CV_PATHS_FILE, "r", encoding="utf-8") as f:
+            cv_paths = json.load(f)
+        if cv_paths:
+            log("CV Asli", f"Membaca: {cv_paths[0]}")
+            cv_asli_teks = baca_pdf_asli(cv_paths[0]) or ''
 
-    if not cv_paths:
-        log("Error", "CV path tidak ditemukan!")
+    if not profil.get('pengalaman_kerja') and not cv_asli_teks:
+        log("Error", "Profil kosong & CV tidak terbaca. Jalankan Fase 1.")
         return
-
-    cv_pdf_path = cv_paths[0]
-    log("CV Asli", f"Membaca: {cv_pdf_path}")
-    cv_asli_teks = baca_pdf_asli(cv_pdf_path)
-
-    if not cv_asli_teks:
-        log("Warning", "Pakai cv_mentah dari profil")
-        cv_asli_teks = profil.get('cv_mentah', '')
 
     # FILTER: Hanya proses yang status 'pending'
     pending_jobs = [j for j in list_lowongan if j.get('status', 'pending') == 'pending']

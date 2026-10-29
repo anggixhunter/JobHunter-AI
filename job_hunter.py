@@ -3,8 +3,16 @@ import os
 from datetime import datetime
 from groq import Groq
 from google import genai
+from google.genai import types
 from docx import Document
 import PyPDF2
+import re
+from docx.table import Table
+from docx.text.paragraph import Paragraph
+try:
+    import fitz  # PyMuPDF: pip install pymupdf
+except ImportError:
+    fitz = None
 from dotenv import load_dotenv
 
 # ==========================================
@@ -19,6 +27,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY").strip()
 GROQ_MODEL = "qwen/qwen3.8-27b"
 GEMINI_MODEL = "gemini-3.5-flash-lite"
 TEMPERATURE = 0.7
+TEMPERATURE_EKSTRAK = 0.2  # ekstraksi data: rendah biar setia ke CV
 
 PROFIL_FILE = "profil_user.json"
 PATH_CV_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "PATH_CV")
@@ -33,12 +42,13 @@ gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 def log(agent, msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {agent}: {msg}")
 
-def ask_ai(prompt, system=""):
+def ask_ai(prompt, system="", temperature=TEMPERATURE):
     log("AI", f"Mencoba {GEMINI_MODEL}...")
     try:
         response = gemini_client.models.generate_content(
             model=GEMINI_MODEL,
-            contents=f"{system}\n\n{prompt}"
+            contents=f"{system}\n\n{prompt}",
+            config=types.GenerateContentConfig(temperature=temperature)
         )
         log("Gemini", f"Berhasil dengan {GEMINI_MODEL}")
         return response.text
@@ -48,7 +58,7 @@ def ask_ai(prompt, system=""):
             resp = groq_client.chat.completions.create(
                 model=GROQ_MODEL,
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-                temperature=TEMPERATURE
+                temperature=temperature
             )
             log("Groq", f"Berhasil dengan {GROQ_MODEL}")
             return resp.choices[0].message.content
@@ -135,19 +145,50 @@ def pilih_cv():
                 return path
         log("Error", "Pilihan tidak valid.")
 
+def _baca_docx(file_path):
+    """Baca DOCX urut sesuai dokumen: paragraf DAN tabel."""
+    doc = Document(file_path)
+    teks = []
+    for child in doc.element.body.iterchildren():
+        if child.tag.endswith('}p'):
+            teks.append(Paragraph(child, doc).text)
+        elif child.tag.endswith('}tbl'):
+            for row in Table(child, doc).rows:
+                sel, prev = [], None
+                for cell in row.cells:
+                    t = cell.text.strip()
+                    if t and t != prev:  # sel merge muncul berulang
+                        sel.append(t)
+                    prev = t
+                if sel:
+                    teks.append(" | ".join(sel))
+    return '\n'.join(teks)
+
+def _baca_pdf(file_path):
+    """PyMuPDF (urutan baca benar utk CV 2 kolom). Fallback PyPDF2."""
+    if fitz:
+        # tanpa sort=True: urutan stream asli, CV 2 kolom tidak tercampur
+        with fitz.open(file_path) as pdf:
+            return '\n'.join(page.get_text("text") for page in pdf)
+    log("Warning", "PyMuPDF belum ada (pip install pymupdf). Pakai PyPDF2, hasil bisa acak.")
+    with open(file_path, 'rb') as f:
+        reader = PyPDF2.PdfReader(f)
+        return '\n'.join((page.extract_text() or "") for page in reader.pages)
+
 def baca_cv(file_path):
     """Baca isi file CV (PDF/DOCX)"""
     if not os.path.exists(file_path):
         return None
     ext = os.path.splitext(file_path)[1].lower()
     if ext == '.docx':
-        doc = Document(file_path)
-        return '\n'.join([p.text for p in doc.paragraphs])
+        teks = _baca_docx(file_path)
     elif ext == '.pdf':
-        with open(file_path, 'rb') as f:
-            reader = PyPDF2.PdfReader(f)
-            return ''.join([page.extract_text() for page in reader.pages])
-    return None
+        teks = _baca_pdf(file_path)
+    else:
+        return None
+    if len(teks.strip()) < 100:
+        log("Warning", "Teks CV hampir kosong. PDF mungkin hasil scan/gambar (butuh OCR).")
+    return teks
 
 # ==========================================
 # 4. FUNGSI MEMORI
@@ -171,6 +212,11 @@ def tampilkan_profil(data):
     display_data = {k: v for k, v in data.items() if k not in ["diperbarui_pada", "cv_mentah"]}
     print(json.dumps(display_data, indent=2, ensure_ascii=False))
     print("="*60)
+
+def bersihkan_json(teks):
+    """Ambil blok { ... } terluar, buang ```json dan teks lain."""
+    awal, akhir = teks.find("{"), teks.rfind("}")
+    return teks[awal:akhir + 1] if awal != -1 and akhir != -1 else teks
 
 # ==========================================
 # 5. SESI INTERAKTIF (DENGAN MODE)
@@ -305,9 +351,9 @@ def jalankan_sesi(mode="baru", profil_lama=None):
     
     # --- GABUNGKAN MENJADI JSON (DENGAN AUTO-TRANSLATE) ---
     log("Profiler", "Menggabungkan & menerjemahkan ke bahasa Inggris profesional...")
-    
+
     final_prompt = f"""
-Gabungkan informasi berikut menjadi JSON rapi dalam BAHASA INGGRIS PROFESIONAL:
+Ekstrak dan gabungkan informasi berikut menjadi JSON dalam BAHASA INGGRIS PROFESIONAL:
 
 CV MENTAH (bahasa asli):
 {cv_text}
@@ -319,10 +365,14 @@ PREFERENSI:
 {preferensi_text}
 
 ATURAN PENTING:
-1. TERJEMAHKAN semua pencapaian dan ringkasan ke bahasa Inggris profesional
-2. Gunakan action verbs (Led, Developed, Optimized, Implemented, dll)
-3. Pertahankan angka, metrik, dan teknologi secara akurat
-4. Optimalkan kata kunci untuk ATS (Applicant Tracking System)
+1. WAJIB salin SEMUA pekerjaan di CV ke "pengalaman_kerja", urutan sama seperti CV. Jangan skip, jangan gabung, jangan tambah yang tidak ada di CV.
+2. Nama perusahaan, jabatan, periode: salin PERSIS dari CV. JANGAN diterjemahkan atau diubah. Jika jabatan tidak tertulis, isi "".
+3. Tiap pekerjaan: salin SEMUA poin tugas ke "pencapaian" (tulis ulang dalam bahasa Inggris profesional, action verbs, angka/metrik/teknologi tetap akurat).
+4. Copy SEMUA pendidikan ke "pendidikan". Sertifikasi/kursus (jika ada) ke "sertifikasi".
+5. "pencapaian_kunci" = 5-8 sorotan terbaik dari seluruh karir + pengalaman tambahan.
+6. JANGAN mengarang. Info yang tidak ada di CV: isi "" atau [].
+7. Optimalkan kata kunci ATS.
+8. Jika CV mengelompokkan skill per kategori, simpan di "skills_terkelompok". "hard_skills" tetap list datar semua skill teknis.
 
 Format JSON:
 {{
@@ -335,25 +385,42 @@ Format JSON:
   "total_tahun_pengalaman": "integer",
   "hard_skills": ["list"],
   "soft_skills": ["list"],
+  "skills_terkelompok": {{"Nama Kategori": ["skill", "skill"]}},
+  "domain_expertise": ["list"],
+  "pengalaman_kerja": [
+    {{"perusahaan": "string", "jabatan": "string", "periode": "string",
+      "tech_stack": ["list"], "pencapaian": ["list bahasa Inggris"]}}
+  ],
+  "pendidikan": [{{"institusi": "string", "gelar": "string", "tahun": "string"}}],
+  "sertifikasi": ["list"],
   "pencapaian_kunci": ["list dalam bahasa Inggris profesional"],
-  "ringkasan_profesi": "string dalam bahasa Inggris (2-3 kalimat)",
-  "cv_mentah": "string (CV asli dalam bahasa aslinya, untuk referensi)"
+  "ringkasan_profesi": "string dalam bahasa Inggris (2-3 kalimat)"
 }}
 
 HANYA keluarkan JSON murni.
 """
-    hasil = ask_ai(final_prompt, "Kamu ahli HR internasional. Keluarkan HANYA JSON.")
-    
-    if hasil:
-        if hasil.startswith("```json"):
-            hasil = hasil[7:-4]
-        elif hasil.startswith("```"):
-            hasil = hasil[3:-4]
+
+    terakhir = None
+    for percobaan in range(1, 3):
+        hasil = ask_ai(final_prompt, "Kamu ahli HR internasional. Keluarkan HANYA JSON.",
+                       temperature=TEMPERATURE_EKSTRAK)
+        if not hasil:
+            continue
         try:
-            return json.loads(hasil)
-        except:
-            log("Error", "JSON tidak valid.")
-            print(hasil)
+            data = json.loads(bersihkan_json(hasil), strict=False)
+        except Exception:
+            log("Error", f"JSON tidak valid (percobaan {percobaan}/2).")
+            continue
+        terakhir = data
+        if data.get("pengalaman_kerja"):
+            data["cv_mentah"] = cv_text  # diisi dari kode, bukan dari AI
+            return data
+        log("Warning", f"pengalaman_kerja kosong (percobaan {percobaan}/2). Coba lagi...")
+
+    if terakhir:
+        log("Warning", "pengalaman_kerja tetap kosong. Cek CV/teks hasil baca!")
+        terakhir["cv_mentah"] = cv_text
+        return terakhir
     return None
 
 # ==========================================
@@ -412,5 +479,5 @@ else:
         tampilkan_profil(data_final)
 
 if data_final:
-    log("Sukses", "Profil siap! Semua pencapaian sudah dalam bahasa Inggris profesional.")
+    log("Sukses", f"Profil siap! {len(data_final.get('pengalaman_kerja', []))} pekerjaan terbaca.")
     log("Next", "Fase 2 (Scout) akan membaca 'profil_user.json' untuk mencari lowongan.")

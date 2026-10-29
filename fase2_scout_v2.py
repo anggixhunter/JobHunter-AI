@@ -20,25 +20,28 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY").strip()
 
 GROQ_MODEL = "openai/gpt-oss-120b"
-GEMINI_MODEL = "gemini-3.5-flash-lite"
+#GEMINI_MODEL = "gemini-3.5-flash-lite"
+GEMINI_MODEL = "gemini-3.5-flash"
 TEMPERATURE = 0.3
 
 PROFIL_FILE = "profil_user.json"
 LOWONGAN_FILE = "lowongan_cocok.json"
 
-JRESULT = 5
-JRESULT2 = 5
+JRESULT = 10
+JRESULT2 = 10
 SITES = ["indeed", "linkedin"]
 COUNTRY = "indonesia"
 NEGARA = "Indonesia"
 HOURS_OLD = 24 * 30
 JEDA_DETIK = 5
+MIN_SKOR_DEFAULT = 65  # skor minimal lowongan lolos (0-100). Bisa diubah saat run.
 PROXY = os.getenv("PROXY") or None
 
 FREEHIRE_URL = "https://freehire.me/api/v1/jobs/search"
 LOKASI_KE_KOTA = {"jakarta": "Jakarta", "bandung": "Bandung", "tangerang": "Tangerang"}
 LOKASI_KE_NEGARA = {"indonesia": "ID", "singapore": "SG", "malaysia": "MY", "thailand": "TH", "vietnam": "VN", "qatar": "QA"}
 TIPKE_MODE = {"remote": "remote", "hybrid": "hybrid", "onsite": "onsite", "on-site": "onsite", "wfo": "onsite"}
+#TIPKE_MODE = {"remote": "remote"}
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -51,18 +54,8 @@ def log(agent, msg):
 
 
 def ask_ai(prompt, system="", label=""):
-    """Coba Gemini, fallback Groq. Log provider yang berhasil dipakai."""
-    try:
-        response = gemini_client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=f"{system}\n\n{prompt}"
-        )
-        if response and response.text:
-            log("Gemini", f"OK {label}".strip())
-            return response.text
-    except Exception as e:
-        log("Gemini", f"Gagal ({str(e)[:80]}). Pindah ke Groq...")
-
+    #"""Coba Gemini, fallback Groq. Log provider yang berhasil dipakai."""
+    """Coba Groq, fallback Gemini. Log provider yang berhasil dipakai."""
     try:
         resp = groq_client.chat.completions.create(
             model=GROQ_MODEL,
@@ -72,7 +65,18 @@ def ask_ai(prompt, system="", label=""):
         log("Groq", f"OK {label}".strip())
         return resp.choices[0].message.content
     except Exception as e:
-        log("Error AI", f"Kedua AI gagal: {str(e)[:60]}")
+        log("Groq", f"Gagal ({str(e)[:80]}). Pindah ke Gemini...")
+
+    try:
+        response = gemini_client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=f"{system}\n\n{prompt}"
+        )
+        if response and response.text:
+            log("Gemini", f"OK {label}".strip())
+            return response.text
+    except Exception as e:
+        log("Error AI", f"Kedua AI gagal: {str(e)[:70]}")
         return None
 
 
@@ -126,7 +130,7 @@ def ke_snippet(deskripsi, batas=600):
 
 def daftar_kata_kunci(profil):
     mentah = re.split(r'[/|,]', profil.get('posisi_target', 'Software Engineer'))
-    return [k.strip() for k in mentah if k.strip()][:3]
+    return [k.strip() for k in mentah if k.strip()][:5]
 
 
 def lokasi_pencarian(profil):
@@ -136,6 +140,25 @@ def lokasi_pencarian(profil):
     return f"{kota}, {NEGARA}"
 
 
+def ringkas_riwayat(profil, maks=4):
+    """Riwayat jabatan singkat utk matcher: 'Jabatan @ Perusahaan (periode)'."""
+    baris = []
+    for j in profil.get('pengalaman_kerja', [])[:maks]:
+        jabatan, pt, periode = j.get('jabatan', ''), j.get('perusahaan', ''), j.get('periode', '')
+        teks = " @ ".join(x for x in (jabatan, pt) if x)
+        if teks:
+            baris.append(f"{teks} ({periode})" if periode else teks)
+    return "; ".join(baris)
+
+
+def parse_salary_threshold(profil):
+    raw = profil.get('range_gaji', '')
+    if not raw:
+        return 0
+    angka = re.findall(r'\d+', str(raw).replace('.', '').replace(',', ''))
+    return int(angka[0]) if angka else 0
+
+
 # ==========================================
 # 5. SCOUT - PENCARIAN (jobspy)
 # ==========================================
@@ -143,7 +166,7 @@ def cari_jobspy(profil, existing_urls=None):
     existing_urls = existing_urls or set()
     lokasi = lokasi_pencarian(profil)
     kata_kunci = daftar_kata_kunci(profil)
-    # Oversample: duplikat dibuang, jadi minta lebih biar tetap dapat JRESULT baru
+    salary_min = parse_salary_threshold(profil)
     target = JRESULT * 2
     per_kata = max(1, target // len(kata_kunci))
     hasil = {}
@@ -187,6 +210,15 @@ def cari_jobspy(profil, existing_urls=None):
             url = bersih(baris.get('job_url_direct')) or bersih(baris.get('job_url'))
             if not url or url in hasil or url in existing_urls:
                 continue
+
+            min_gaji = bersih(baris.get('min_amount'))
+            max_gaji = bersih(baris.get('max_amount'))
+            if salary_min > 0:
+                if min_gaji and re.fullmatch(r'\d+(\.\d+)?', min_gaji) and float(min_gaji) < salary_min:
+                    continue
+                if max_gaji and re.fullmatch(r'\d+(\.\d+)?', max_gaji) and float(max_gaji) < salary_min:
+                    continue
+
             hasil[url] = {
                 "title": bersih(baris.get('title'), "No Title"),
                 "company": bersih(baris.get('company'), "Unknown"),
@@ -206,7 +238,7 @@ def cari_jobspy(profil, existing_urls=None):
 # ==========================================
 def cari_freehire(profil, existing_urls=None, limit=JRESULT2):
     existing_urls = existing_urls or set()
-    posisi = profil.get('posisi_target', 'Software Engineer')
+    posisi = daftar_kata_kunci(profil)[0] if daftar_kata_kunci(profil) else 'Software Engineer'
     lokasi = profil.get('lokasi', 'Indonesia').strip().lower()
 
     base = {"q": posisi, "limit": limit * 2, "sort": "posted_at", "order": "desc"}
@@ -303,6 +335,9 @@ Kamu adalah ahli rekrutmen. Nilai kecocokan lowongan ini dengan profil kandidat.
 PROFIL KANDIDAT:
 - Posisi Target: {profil.get('posisi_target')}
 - Hard Skills: {', '.join(profil.get('hard_skills', []))}
+- Pengalaman: {profil.get('total_tahun_pengalaman', '-')} tahun
+- Riwayat Jabatan: {ringkas_riwayat(profil) or '-'}
+- Ringkasan: {profil.get('ringkasan_profesi', '-')}
 - Tipe Kerja: {', '.join(profil.get('tipe_kerja', []))}
 - Lokasi: {profil.get('lokasi')}
 
@@ -329,14 +364,25 @@ Alasan: [1 kalimat]
     return "N/A", "Gagal menilai."
 
 
+def tanya_min_skor():
+    """Tanya skor minimal. Enter = default."""
+    jawab = input(f"\nSkor minimal lolos 0-100 (Enter = {MIN_SKOR_DEFAULT}): ").strip().rstrip('%')
+    if not jawab:
+        return MIN_SKOR_DEFAULT
+    if jawab.isdigit() and 0 <= int(jawab) <= 100:
+        return int(jawab)
+    log("Sistem", f"Input tidak valid. Pakai {MIN_SKOR_DEFAULT}.")
+    return MIN_SKOR_DEFAULT
+
+
 # ==========================================
 # 7. MAIN
 # ==========================================
 def main():
-    print("\n" + "="*60)
+    print("\n" + "="*70)
     print("JOB HUNTER AI - FASE 2: SCOUT (jobspy)")
     print(f"Sumber: jobspy ({', '.join(SITES)}) + Freehire")
-    print("="*60)
+    print("="*70)
 
     if not os.path.exists(PROFIL_FILE):
         log("Error", f"'{PROFIL_FILE}' tidak ditemukan!")
@@ -367,9 +413,10 @@ def main():
         log("Scout", "Tidak ada hasil")
         return
 
-    print("\n" + "="*60)
-    print("HASIL (Skor >= 60%)")
-    print("="*60)
+    min_skor = tanya_min_skor()
+    print("\n" + "="*70)
+    print(f"HASIL (Skor >= {min_skor}%)")
+    print("="*70)
 
     lowongan_cocok = []
     for i, job in enumerate(jobs, 1):
@@ -380,8 +427,8 @@ def main():
         m_angka = re.search(r'\d+', str(skor_str))
         skor = min(int(m_angka.group()), 100) if m_angka else 0
 
-        if skor < 60:
-            log("Skip", f"{job['title'][:45]} -> {skor_str} (bawah 60)")
+        if skor < min_skor:
+            log("Skip", f"{job['title'][:45]} -> {skor_str} (bawah {min_skor})")
             continue
 
         print(f"\n[{len(lowongan_cocok)+1}] {job['title']}")
@@ -389,7 +436,7 @@ def main():
         print(f"    {job['url']}")
         print(f"    Skor: {skor}%")
         print(f"    {alasan}")
-        print("-" * 60)
+        print("-" * 70)
 
         lowongan_cocok.append({
             **job,
@@ -407,16 +454,16 @@ def main():
         with open(LOWONGAN_FILE, "w", encoding="utf-8") as f:
             json.dump(all_jobs, f, indent=2, ensure_ascii=False)
 
-        print("\n" + "="*60)
+        print("\n" + "="*70)
         print("DATABASE UPDATE:")
         print(f"   • Ditemukan: {len(lowongan_cocok)}")
         print(f"   • Ditambahkan: {added}")
         print(f"   • Duplikat: {len(lowongan_cocok) - added}")
         print(f"   • Total: {len(all_jobs)}")
-        print("="*60)
+        print("="*70)
         log("Sukses", "Fase 2 selesai!")
     else:
-        log("Sistem", "Tidak ada lowongan >= 60%")
+        log("Sistem", f"Tidak ada lowongan >= {min_skor}%")
 
 
 if __name__ == "__main__":
