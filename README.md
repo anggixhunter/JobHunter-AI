@@ -71,7 +71,7 @@ Selain Python, tidak ada yang perlu dipasang manual — Git hanya diperlukan kal
 ### 1. Unduh proyek
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/anggixhunter/JobHunter-AI
 cd Seeker-GIT
 ```
 
