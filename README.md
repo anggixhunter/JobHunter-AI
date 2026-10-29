@@ -43,7 +43,7 @@ Fase 3 (Tailor)    -> PATH_CV/LAMAR/<tanggal>/<perusahaan>_<posisi>/
 | 2 | `fase2_scout_v2.py` | Scrape lowongan via `jobspy` (Indeed + LinkedIn) dan Freehire API, nilai skor 0-100 |
 | 3 | `fase3_tailor_v2.py` | Scrape detail lowongan, tulis ulang ringkasan + cover letter, ekspor DOCX/PDF |
 
-`main.py` adalah menu utama. Hanya lowongan dengan skor >= 60 yang masuk database.
+`main.py` adalah menu utama. Skor bisa di input langsung. Default hanya lowongan dengan skor >= 65 yang masuk database.
 
 Fase 3 berhenti setelah dokumen siap. **Lamaran tetap dikirim manual oleh Anda** — lihat [Fase 3 tidak mengirim lamaran](#fase-3-tidak-mengirim-lamaran--anda-yang-melamar).
 
